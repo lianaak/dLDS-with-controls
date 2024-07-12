@@ -1,0 +1,53 @@
+from models import SLDSwithControl
+import numpy as np
+from scipy import sparse
+
+
+class SLDSwithControlDataset(SLDSwithControl):
+    """_summary_
+
+    Args:
+        SLDSwithControl (_type_): _description_
+    """
+
+    def __init__(self, A, B, K, D_control, z_=None, u_=None):
+        super().__init__(A, B, K, D_control)
+
+    def generate(self, T,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None):
+
+        # define time intervals for each discrete state z
+        z_interval = np.random.randint(1, discrete_state_maxT, size=T//10)
+        z = np.zeros(T, dtype=int)
+
+        # create a random sequence of discrete states z
+        current_state = np.random.randint(0, self.K)
+        z[0:z_interval[0]] = current_state  # initial state
+        for i in range(1, T//10):
+            start = np.sum(z_interval[:i])
+            end = start + z_interval[i]
+            current_state = (current_state + 1) % self.K
+            z[start:end] = current_state
+
+        self.z_ = z
+        # one hot encoding of the states, e.g. [1, 0, 0] for state 0 at time point t
+        z_one_hot = np.zeros((T, self.K))
+        z_one_hot[np.arange(T), z] = 1
+
+        # Define control input
+        u_temp = sparse.rand(T, self.D_control, density=control_density,
+                             format="csr")
+        # add the z one hot encoding to the control input
+        self.u_ = sparse.hstack((u_temp, z_one_hot)).A
+
+        # define first state x[0] with initial conditions
+        if initial_conditions is None:
+            initial_conditions = np.random.randn(self.A[0].shape[0])
+        x = np.zeros((T, self.A[0].shape[0], 1))
+        x[0] = np.array(initial_conditions).reshape(-1, 1)
+
+        # generate the rest of the states
+        for i in range(1, T-1):
+            x[i] = self.A[self.z_[i]] @ x[i-1] + \
+                self.B @ self.u_[i-1, :].reshape(-1, 1)
+
+        return x

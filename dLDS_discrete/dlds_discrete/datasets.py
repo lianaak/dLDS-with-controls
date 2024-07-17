@@ -4,10 +4,24 @@ from scipy import sparse
 
 
 class SLDSwithControlDataset(SLDSwithControl):
-    """_summary_
+    """generates data from a SLDS with controls system
 
-    Args:
-        SLDSwithControl (_type_): _description_
+    Parameters
+    ----------
+
+    A : list of numpy arrays
+        List of A matrices for each discrete state
+    B : numpy array
+        B matrix
+    K : int
+        Number of discrete states
+    D_control : int
+        Number of control inputs
+    z_ : numpy array
+        Discrete states
+    u_ : numpy array
+        Control inputs
+
     """
 
     def __init__(self, A, B, K, D_control, z_=None, u_=None):
@@ -36,6 +50,7 @@ class SLDSwithControlDataset(SLDSwithControl):
         # Define control input
         u_temp = sparse.rand(T, self.D_control, density=control_density,
                              format="csr")
+        u_temp.data[:] = 1  # such that we only have 0 and 1
         # add the z one hot encoding to the control input
         self.u_ = sparse.hstack((u_temp, z_one_hot)).A
 

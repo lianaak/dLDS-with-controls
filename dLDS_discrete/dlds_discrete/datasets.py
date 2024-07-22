@@ -27,7 +27,7 @@ class SLDSwithControlDataset(SLDSwithControl):
     def __init__(self, A, B, K, D_control, z_=None, u_=None):
         super().__init__(A, B, K, D_control)
 
-    def generate(self, T,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None):
+    def generate(self, T,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None, fix_point_change=False, add_noise=False):
 
         # define time intervals for each discrete state z
         z_interval = np.random.randint(1, discrete_state_maxT, size=T//10)
@@ -44,25 +44,31 @@ class SLDSwithControlDataset(SLDSwithControl):
 
         self.z_ = z
         # one hot encoding of the states, e.g. [1, 0, 0] for state 0 at time point t
-        z_one_hot = np.zeros((T, self.K))
-        z_one_hot[np.arange(T), z] = 1
+        z_one_hot = np.zeros((self.K, T))
+        z_one_hot[z, np.arange(T)] = 1
 
         # Define control input
-        u_temp = sparse.rand(T, self.D_control, density=control_density,
+        u_temp = sparse.rand(self.D_control, T, density=control_density,
                              format="csr")
-        u_temp.data[:] = 1  # such that we only have 0 and 1
+        # u_temp.data[:] = 1  # such that we only have 0 and 1
         # add the z one hot encoding to the control input
-        self.u_ = sparse.hstack((u_temp, z_one_hot)).A
+        if fix_point_change:
+            self.u_ = sparse.vstack((u_temp, z_one_hot)).A
+        else:
+            self.u_ = u_temp.A
 
         # define first state x[0] with initial conditions
         if initial_conditions is None:
             initial_conditions = np.random.randn(self.A[0].shape[0])
-        x = np.zeros((T, self.A[0].shape[0], 1))
-        x[0] = np.array(initial_conditions).reshape(-1, 1)
+        x = np.zeros((self.A[0].shape[0], T, 1))
+        x[:, 0] = np.array(initial_conditions).reshape(-1, 1)
 
         # generate the rest of the states
         for i in range(1, T-1):
-            x[i] = self.A[self.z_[i]] @ x[i-1] + \
-                self.B @ self.u_[i-1, :].reshape(-1, 1)
+            x[:, i] = self.A[self.z_[i]] @ x[:, i-1] + \
+                self.B @ self.u_[:, i-1].reshape(-1, 1)
+
+        if add_noise:
+            x += 0.1*np.random.randn(*x.shape)
 
         return x

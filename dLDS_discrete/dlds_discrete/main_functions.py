@@ -125,7 +125,7 @@ def create_lorenz_mat(t=[], initial_conds=(0., 1., 1.05), txy=[], with_control=F
     return x[:, 0], x[:, 1], x[:, 2]
 
 
-def create_slds(K=2, D_obs=4, D_control=1):
+def create_slds(K=2, D_obs=4, D_control=1, fix_point_change=False):
     """
     create a simple SLDS model with random dynamics and control matrix B. Returns an SLDS object that can be used to generate data. 
 
@@ -174,8 +174,9 @@ def create_slds(K=2, D_obs=4, D_control=1):
 
     # B matrix for all states
     B = np.array(np.random.rand(D_obs, D_control))
-    for _ in range(K):
-        B = np.hstack((B, np.array(np.random.rand(D_obs, 1))))
+    if fix_point_change:
+        for _ in range(K):
+            B = np.hstack((B, np.array(np.random.rand(D_obs, 1))))
 
     return SLDSwithControlDataset(A, B, K, D_control)
 

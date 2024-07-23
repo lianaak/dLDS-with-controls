@@ -1366,6 +1366,44 @@ def movmfunc(func, mat, window=3, direction=0):
     return movefunc_res
 
 
+def create_reco2(latent_dyn, coefficients, F, type_find='median', min_far=10, smooth_coeffs=False):
+    """
+    This function creates the reconstruction 
+    Inputs:
+        latent_dyn   = the ground truth latent dynamics
+        coefficients = the operators coefficients (c(t)_i)
+        F            = a list of transport operators (a list with M transport operators, 
+                                                      each is a square matrix, kXk, where k is the latent dynamics
+                                                      dimension )
+        type_find    = 'median'
+        min_far      = 10
+        smooth_coeffs= False
+
+    Outputs:
+        cur_reco    = dLDS reconstruction of the latent dynamics
+
+    """
+    if smooth_coeffs:
+        coefficients = movmfunc(
+            np.nanmedian, coefficients, window=5, direction=1)
+
+    cur_reco = np.zeros((latent_dyn.shape[0], latent_dyn.shape[1]-1))
+    cur_reco[:, 0] = latent_dyn[:, 0]
+    eigenvalues = []
+    
+    for i, f_i in enumerate(F):
+        # return the eigenvalues of the matrix
+        eigenvalues.append(np.linalg.eigvals(f_i))
+    
+    for time_point in range(1, latent_dyn.shape[1]-1):
+
+        print(cur_reco[:, time_point-1])
+        cur_reco[:, time_point] = np.dstack([coefficients[i, time_point-1]*f_i @
+                                             cur_reco[:, time_point-1] for i, f_i in enumerate(F)]).sum(2).T.reshape((-1,))
+
+    return cur_reco, eigenvalues
+
+
 def create_reco(latent_dyn, coefficients, F, type_find='median', min_far=10, smooth_coeffs=False,
                 smoothing_params={'wind': 5}):
     """

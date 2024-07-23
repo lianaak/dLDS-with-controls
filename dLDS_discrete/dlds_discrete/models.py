@@ -31,7 +31,15 @@ class ControlModel:
         self.control_density = control_density
 
     def fit(self, X, Y, num_iter, U_0=None, D_control=1):
-        """Fit the control model
+        """Fit the control model from the data X and Y
+
+        Args:
+            X (np.ndarray): Data matrix X
+            Y (np.ndarray): Data matrix Y
+            num_iter (int): Number of iterations
+            U_0 (np.ndarray, optional): Initial control input. Defaults to None.
+            D_control (int, optional): Number of control inputs. Defaults to 1.
+
 
         """
 
@@ -69,9 +77,6 @@ class ControlModel:
 
             # solve for U using the current A and B
             U = np.linalg.lstsq(B, Y - A @ X, rcond=None)[0]
-
-            # ensure that U is positive
-            # U = np.abs(U)
 
             # update sparsity pattern
             U_nonsparse = U.copy()

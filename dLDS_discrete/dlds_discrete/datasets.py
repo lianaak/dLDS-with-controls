@@ -27,7 +27,7 @@ class SLDSwithControlDataset(SLDSwithControl):
     def __init__(self, A, B, K, D_control, z_=None, u_=None):
         super().__init__(A, B, K, D_control)
 
-    def generate(self, T,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None, fix_point_change=False, add_noise=False):
+    def generate(self, T,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None, fix_point_change=False, sigma=0):
 
         # define time intervals for each discrete state z
         z_interval = np.random.randint(1, discrete_state_maxT, size=T//10)
@@ -68,7 +68,7 @@ class SLDSwithControlDataset(SLDSwithControl):
             x[:, i] = self.A[self.z_[i]] @ x[:, i-1] + \
                 self.B @ self.u_[:, i-1].reshape(-1, 1)
 
-        if add_noise:
-            x += 0.1*np.random.randn(*x.shape)
+        if sigma > 0:
+            x += sigma*np.random.randn(*x.shape)
 
         return x

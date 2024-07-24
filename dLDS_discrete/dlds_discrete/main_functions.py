@@ -413,7 +413,7 @@ def train_model_include_D(max_time=500, dt=0.1, dynamics_type='cyl', num_subdyns
     """
         if counter != 1:
             coefficients = update_c(
-                F, latent_dyn, params, random_state=seed, other_params=other_params_c)
+                F, latent_dyn, params, random_state=seed, other_params=other_params_c, cofficients=coefficients)
 
         """
     Update D
@@ -698,28 +698,40 @@ def update_c(F, latent_dyn,
             total_next_dyn = np.reshape(np.array(total_next_dyn), (-1, 1))
         if len(F) == 1:
             stacked_fx = np.reshape(stacked_fx, [-1, 1])
+        # print(
+        #    f'Update c at time point {time_point} with {params_update_c} and coefficients shape {len(cofficients)}')
         if params_update_c['smooth_term'] > 0 and time_point > 0:
-            if len(cofficients) == 0:
+            if len(coeffs_list) == 0:
                 warnings.warn(
                     "Warning: you called the smoothing option without defining coefficients")
-        if params_update_c['smooth_term'] > 0 and time_point > 0 and len(cofficients) > 0:
-            c_former = cofficients[:, time_point-1].reshape((-1, 1))
+        if params_update_c['smooth_term'] > 0 and time_point > 0 and len(coeffs_list) > 0:
+            # c_former = cofficients[:, time_point-1]  # .reshape((-1, 1))
+            c_former = coeffs_list[-1]
             total_next_dyn_full = np.hstack(
                 [total_next_dyn, np.sqrt(params_update_c['smooth_term'])*c_former])
-            stacked_fx_full = np.hstack([stacked_fx, np.sqrt(
-                params_update_c['smooth_term'])*np.eye(len(stacked_fx))])
+
+            # stacked_fx_full = np.hstack([stacked_fx, np.sqrt(
+            # params_update_c['smooth_term'])*np.eye(len(stacked_fx))])
+
+            stacked_fx_full = np.vstack([stacked_fx, np.sqrt(
+                params_update_c['smooth_term'])*np.eye(len(c_former))])  # .T # EDIT maybe instead of stacked_fx use c_former and instead of np.hstack vstack
+
         else:
             total_next_dyn_full = total_next_dyn
             stacked_fx_full = stacked_fx
 
         if params_update_c['update_c_type'] == 'inv' or (params_update_c['reg_term'] == 0 and params_update_c['smooth_term'] == 0):
             try:
+
+                # if first iteration, extend stacked_fx_full and total_next_dyn_full to be the same size as the rest of the iterations
+
                 coeffs = linalg.pinv(
                     stacked_fx_full) @ total_next_dyn_full.reshape((-1, 1))
-            except:
+            except Exception as e:
                 if not skip_error:
-                    raise NameError(
-                        'A problem in taking the inverse of fx when looking for the model coefficients')
+                    raise e
+                    # raise NameError(
+                    #    'A problem in taking the inverse of fx when looking for the model coefficients')
                 else:
                     return np.nan*np.ones((len(F), latent_dyn.shape[1]))
         elif params_update_c['update_c_type'] == 'lasso':
@@ -1390,14 +1402,13 @@ def create_reco2(latent_dyn, coefficients, F, type_find='median', min_far=10, sm
     cur_reco = np.zeros((latent_dyn.shape[0], latent_dyn.shape[1]-1))
     cur_reco[:, 0] = latent_dyn[:, 0]
     eigenvalues = []
-    
+
     for i, f_i in enumerate(F):
         # return the eigenvalues of the matrix
         eigenvalues.append(np.linalg.eigvals(f_i))
-    
+
     for time_point in range(1, latent_dyn.shape[1]-1):
 
-        print(cur_reco[:, time_point-1])
         cur_reco[:, time_point] = np.dstack([coefficients[i, time_point-1]*f_i @
                                              cur_reco[:, time_point-1] for i, f_i in enumerate(F)]).sum(2).T.reshape((-1,))
 

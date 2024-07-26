@@ -2,8 +2,9 @@
 __pycache__/
 *.py[cod]
 
-dLDS_discrete/dlds_discrete/toy_example.ipynb
-dLDS_discrete/dlds_discrete/toy_example2.ipynb
+*toy_example.ipynb
+*toy_example2.ipynb
 
 # h5 files
 *.h5
+dLDS_discrete/dlds_discrete/cdlds/toy_example.ipynb

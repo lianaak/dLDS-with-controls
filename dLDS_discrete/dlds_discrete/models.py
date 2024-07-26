@@ -1,24 +1,77 @@
 import numpy as np
 from pydmd import DMDc
 import util_controls as uc
+from dataclasses import dataclass
+from datasets import CdLDSDataGenerator
 
 
-class SLDSwithControl:
+@dataclass
+class DLDSwithControlModel:
+    """_summary_
 
-    """Switching Linear Dynamical System with Control
+    Attributes
+    ----------
+    datasets : CdLDSDataGenerator
+        A class that generates data from a DLDS with controls system
+    X : np.ndarray
+        The data
+    coeffs_ : np.ndarray
+        The coefficients of the model
+    F_ : np.ndarray
+        The sub-dynamics of the model
     """
 
-    def __init__(self, A, B, K, D_control):
-        self.A = A
-        self.B = B
-        self.K = K
-        self.D_control = D_control
+    datasets: CdLDSDataGenerator = CdLDSDataGenerator()
+    X: np.ndarray = None
+    coeffs_: np.ndarray = None
+    F_: np.ndarray = None
 
-    def fit(self, x, u):
-        pass
+    def fit(self, max_time=500, dt=0.1, num_subdyns=3, error_reco=np.inf, data=[], step_f=30, GD_decay=0.85, max_error=1e-3,
+            max_iter=3000, F=[], coefficients=[], params={'update_c_type': 'inv', 'reg_term': 0, 'smooth_term': 0},
+            epsilon_error_change=10**(-5), D=[], x_former=[], latent_dim=None, include_D=False, step_D=30, reg1=0, reg_f=0,
+            max_data_reco=1e-3, sigma_mix_f=0.1, action_along_time='median', seed=0, seed_f=0,
+            normalize_eig=True, init_distant_F=False, max_corr=0.1, decaying_reg=1, other_params_c={}, include_last_up=False):
+        """
+        This is the main function to train the model! 
+        Inputs:
+            max_time      = Number of time points for the dynamics. Relevant only if data is empty;
+            dt            =  time interval for the dynamics
+            num_subdyns   = number of sub-dynamics
+            error_reco    = intial error for the reconstruction (do not touch)
+            data          = if one wants to use a pre define groud-truth dynamics. If not empty - it overwrites max_time, dt, and dynamics_type
+            step_f        = initial step size for GD on the sub-dynamics
+            GD_decay      = Gradient descent decay rate
+            max_error     = Threshold for the model error. If the model arrives at a lower reconstruction error - the training ends.
+            max_iter      = # of max. iterations for training the model
+            F             = pre-defined sub-dynamics. Keep empty if random.
+            coefficients  = pre-defined coefficients. Keep empty if random.
+            params        = dictionary that includes info about the regularization and coefficients solver. e.g. {'update_c_type':'inv','reg_term':0,'smooth_term':0}
+            epsilon_error_change = check if the sub-dynamics do not change by at least epsilon_error_change, for at least 5 last iterations. Otherwise - add noise to f
+            D             = pre-defined D matrix (keep empty if D = I)
+            latent_dim    =  If D != I, it is the pre-defined latent dynamics.
+            include_D     = If True -> D !=I; If False -> D = I
+            step_D        = GD step for updating D, only if include_D is true
+            reg1          = if include_D is true -> L1 regularization on D
+            reg_f         = if include_D is true ->  Frobenius norm regularization on D
+            max_data_reco = if include_D is true -> threshold for the error on the reconstruction of the data (continue training if the error (y - Dx)^2 > max_data_reco)
+            sigma_mix_f            = std of noise added to mix f
+            action_along_time      = the function to take on the error over time. Can be 'median' or 'mean'
+            seed                   = random seed
+            seed_f                 = random seed for initializing f
+            normalize_eig          = whether to normalize each sub-dynamic by dividing by the highest abs eval
+            init_distant_F         = when initializing F -> make sure that the correlation between each pair of {f}_i does not exeed a threshold
+            max_corr               = max correlation between each pair of initial sub-dyns (relevant only if init_distant_F is True)
+            decaying_reg           = decaying factor for the l1 regularization on the coefficients. If 1 - there is no decay. (should be a scalar in (0,1])
+            other_params_c         = additional parameters for the update step of c
+            include_last_up        = add another update step of the coefficients at the end
+        """
+        self.F_ = F
+        self.coeffs_ = coefficients
+        self.X = data
 
-    def transform(self, x, u):
-        pass
+    def __str__(self):
+        # we just want to print all attributes
+        return str(self.__dict__.keys())
 
 
 class ControlModel:
@@ -39,8 +92,6 @@ class ControlModel:
             num_iter (int): Number of iterations
             U_0 (np.ndarray, optional): Initial control input. Defaults to None.
             D_control (int, optional): Number of control inputs. Defaults to 1.
-
-
         """
 
         if U_0 is None:

@@ -36,7 +36,7 @@ try:
     from numpy.linalg import matrix_power
     from scipy.linalg import expm
     from sklearn import linear_model
-    from datasets import SLDSwithControlDataset
+    from datasets import DLDSwithControlDataset
 except:
     print('itertools was not uploaded')
 
@@ -125,60 +125,7 @@ def create_lorenz_mat(t=[], initial_conds=(0., 1., 1.05), txy=[], with_control=F
     return x[:, 0], x[:, 1], x[:, 2]
 
 
-def create_slds(K=2, D_obs=4, D_control=1, fix_point_change=False):
-    """
-    create a simple SLDS model with random dynamics and control matrix B. Returns an SLDS object that can be used to generate data. 
 
-    Args:
-        K (int, optional): number of sub-dynamics. Defaults to 2.
-        dim (int, optional): dimensionality of the resulting space. Has to be an even number since we are using conjugate pairs for constructing A. Defaults to 4.
-        control_dim (int, optional): dimensionality of the control signals. Defaults to 1.
-
-    Returns:
-        SLDSwithControl: SLDS object with sub-dynamics A and control matrix B.
-    """
-
-    assert D_obs % 2 == 0, "Dimension should be even"
-
-    A = []
-    for k in range(K):
-
-        np.random.seed(k)
-        # define eigenvalues to be on the unit circle
-        # eigenvalues on the unit circle, 1j is the imaginary unit such that we can sample points on the entire circle
-        # not all values on the unit circle are complex, but we sample only complex ones here for simplicity
-        # the imaginary part should be relatively small such that we have fewer oscillations
-        complex_eigenvals = np.exp(
-            0.06j * np.random.rand(int(D_obs/2)) * 2 * np.pi)
-
-        # to obtain a real matrix with complex eigenvalues, we need to use the Jordan form which requires blocks with conjugate pairs of eigenvalues (aka. a + bi and a - bi)
-        jordan_blocks = []
-        for eigval in complex_eigenvals:
-            a = eigval.real
-            b = eigval.imag
-            jordan_blocks.append(np.array([[a, -b], [b, a]]))
-
-        # create a block diagonal matrix from all the Jordan blocks
-        jordan = linalg.block_diag(*jordan_blocks)
-
-        A_rand = np.random.rand(D_obs, D_obs)
-        Q, _ = np.linalg.qr(A_rand)
-
-        A_k = (Q @ jordan @ np.linalg.inv(Q)).real*0.9
-
-        # check if the eigenvalues are on the unit circle
-        # assert np.allclose(
-        #    np.abs(np.linalg.eig(A_k)[0]), 1), "Eigenvalues are not on the unit circle"
-
-        A.append(A_k)
-
-    # B matrix for all states
-    B = np.array(np.random.rand(D_obs, D_control))
-    if fix_point_change:
-        for _ in range(K):
-            B = np.hstack((B, np.array(np.random.rand(D_obs, 1))))
-
-    return SLDSwithControlDataset(A, B, K, D_control)
 
 
 def normalize_matrix(A):

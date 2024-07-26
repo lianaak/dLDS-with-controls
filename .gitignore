@@ -1,1 +1,9 @@
-dLDS_discrete/dlds_discrete/quartiled_data_0602.h5
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+dLDS_discrete/dlds_discrete/toy_example.ipynb
+dLDS_discrete/dlds_discrete/toy_example2.ipynb
+
+# h5 files
+*.h5

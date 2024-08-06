@@ -2,9 +2,16 @@
 __pycache__/
 *.py[cod]
 
-*toy_example.ipynb
-*toy_example2.ipynb
-
 # h5 files
 *.h5
 dLDS_discrete/dlds_discrete/cdlds/toy_example.ipynb
+
+# virtualenv
+*.venv*
+
+# experimental files
+*toy_example.ipynb
+*toy_example2.ipynb
+*toy_data_noga.ipynb
+dLDS_discrete/dlds_discrete/cdlds/models2.py
+dLDS_discrete/dlds_discrete/cdlds/combining_dlds_controls_2.ipynb

@@ -117,8 +117,10 @@ class CdLDSDataGenerator:
 
             self.A.append(A_k)
 
-        # B matrix for all states
+        # B matrix is random
         self.B = np.array(np.random.rand(self.D_obs, self.D_control))
+
+        # add additional B matrix for each state
         if self.fix_point_change:
             for _ in range(self.K):
                 self.B = np.hstack(
@@ -157,9 +159,9 @@ class CdLDSDataGenerator:
 
         # add the z one hot encoding to the control input
         if self.fix_point_change:
-            self.U_ = sparse.vstack((u_temp, z_one_hot)).A
+            self.U_ = sparse.vstack((u_temp, z_one_hot)).toarray()
         else:
-            self.U_ = u_temp.A
+            self.U_ = u_temp.toarray()
 
     def single_step_reconstruction(self, x, A, B, u):
         """Single step of the system
@@ -175,7 +177,7 @@ class CdLDSDataGenerator:
         """
         return A @ x + B @ u
 
-    def multi_step_reconstruction(self, T, X0, A, B, U, z):
+    def multi_step_reconstruction(self, n_time_points, X0, A, B, U, z):
         """Multi step of the system
 
         Args:
@@ -191,10 +193,10 @@ class CdLDSDataGenerator:
         """
 
         D = A[0].shape[0]
-        X_reconstructed = np.zeros((D, T))
+        X_reconstructed = np.zeros((D, n_time_points))
         X_reconstructed[:, 0] = X0
 
-        for t in range(1, T-1):
+        for t in range(1, n_time_points-1):
             X_reconstructed[:, t] = self.single_step_reconstruction(
                 x=X_reconstructed[:, t-1], A=A[z[t]], B=B, u=U[:, t-1])
 

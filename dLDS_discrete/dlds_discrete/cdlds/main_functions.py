@@ -15,32 +15,28 @@ Imports
 # Linear algebra imports
 
 
-try:
-    from functools import partial
-    import dill
-    import pickle
-    import warnings
-    import mat73
-    import os
-    import matplotlib
-    import numpy as np
-    from scipy import linalg
-    from scipy.integrate import odeint
-    from scipy.interpolate import interp1d
-    import pandas as pd
-    import random
-    from webcolors import name_to_rgb
-    import matplotlib.pyplot as plt
-    import itertools
-    import seaborn as sns
-    from numpy.linalg import matrix_power
-    from scipy.linalg import expm
-    from sklearn import linear_model
-    from datasets import DLDSwithControlDataset
-except:
-    print('itertools was not uploaded')
-
 # os and files loading imports
+from functools import partial
+import dill
+import pickle
+import warnings
+import mat73
+import os
+import matplotlib
+import numpy as np
+from scipy import linalg
+from scipy.integrate import odeint
+from scipy.interpolate import interp1d
+import pandas as pd
+import random
+from webcolors import name_to_rgb
+import matplotlib.pyplot as plt
+import itertools
+import seaborn as sns
+from numpy.linalg import matrix_power
+from scipy.linalg import expm
+from sklearn import linear_model
+import pylops
 sep = os.sep
 
 
@@ -685,8 +681,8 @@ def update_c(F, latent_dyn,
         elif params_update_c['update_c_type'].lower() == 'spgl1':
             # print('spgl1')
             Aop = pylops.MatrixMult(stacked_fx_full)
-            coeffs = pylops.optimization.sparsity.SPGL1(Aop, total_next_dyn_full.flatten(), iter_lim=params_update_c['num_iters'],
-                                                        tau=params_update_c['reg_term'])[0]
+            coeffs = pylops.optimization.sparsity.spgl1(
+                Aop, total_next_dyn_full.flatten(), tau=params_update_c['reg_term'])[0]
 
         elif params_update_c['update_c_type'].lower() == 'irls':
             # print('irls')

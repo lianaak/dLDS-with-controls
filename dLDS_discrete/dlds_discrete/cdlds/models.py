@@ -16,6 +16,79 @@ import random
 import util_controls as uc
 import plotly.express as px
 import pylops
+import torch
+import slim
+
+
+class DeepDLDS(torch.nn.Module):
+
+    def __init__(self, input_size, output_size, num_subdyn, time_points, softmax_temperature=1):
+        super().__init__()
+
+        in_size = input_size
+
+        self.softmax_temperature = softmax_temperature
+
+        # no final activation function because we have a regression problem
+        self.F = torch.nn.ParameterList()  # can't be a simple list
+        # self.coeffs = torch.nn.ParameterList() # TODO: create matrix of coefficients
+        self.coeffs = torch.nn.Parameter(torch.tensor(
+            np.ones((num_subdyn, time_points)), requires_grad=True))
+
+        for i in range(num_subdyn):
+            f_i = slim.linear.BoundedNormLinear(
+                input_size, input_size, bias=True)
+            # f_i = torch.nn.Parameter(torch.randn( output_size, output_size))
+            # coefficients for each time point that have to be learned. initial value is 1
+            # c_i = torch.nn.Parameter(torch.ones(time_points))
+            self.F.append(f_i)
+            # self.coeffs.append(c_i)
+
+        # self.network = torch.nn.Sequential(*self.layers)
+
+    def forward(self, x_t, t):
+        # this forward function is always called when we call the model (it's somewhere in __call__ method)
+        # F = self.F[i](X).view(-1, X.shape[1], X.shape[1])
+
+        # take an average over the batch dimension
+        # F = torch.mean(F, dim=0)
+
+        # c = self.coeffs[i](X)
+        _coeffs = self.soft_coeffs
+
+        # combination of all f_i * c_i
+        y = torch.stack([_coeffs[i, t]*f_i(x_t)
+                        for i, f_i in enumerate(self.F)]).sum(dim=0)
+        return y
+
+    @property
+    def soft_coeffs(self):
+        return torch.nn.functional.softmax(self.coeffs / self.softmax_temperature, dim=0)
+
+
+class SimpleNN(torch.nn.Module):
+    """a simple fully connected neural network with ReLU activation functions and a linear output layer
+    """
+
+    def __init__(self, input_size, hidden_sizes, output_size):
+        super().__init__()
+
+        in_size = input_size
+        self.layers = []
+        # define multiple layers in a loop
+        for hidden_size in hidden_sizes:
+            self.layers.append(torch.nn.Linear(in_size, hidden_size))
+            self.layers.append(torch.nn.ReLU())
+            in_size = hidden_size
+
+        self.layers.append(torch.nn.Linear(in_size, output_size))
+        # no final activation function because we have a regression problem
+
+        self.network = torch.nn.Sequential(*self.layers)
+
+    def forward(self, x):
+        # this forward function is always called when we call the model (it's somewhere in __call__ method)
+        return self.network(x)
 
 
 @dataclass

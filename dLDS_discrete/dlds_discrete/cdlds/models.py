@@ -3,6 +3,8 @@ from inspect import stack
 from locale import normalize
 from mimetypes import init
 from turtle import st
+from matplotlib.pylab import eig
+from networkx import sigma
 import numpy as np
 from pydmd import DMDc
 import util_controls as uc
@@ -11,8 +13,6 @@ from datasets import CdLDSDataGenerator
 from scipy import linalg
 from scipy.linalg import expm
 from sklearn import linear_model
-import itertools
-import random
 import util_controls as uc
 import plotly.express as px
 import pylops
@@ -25,45 +25,57 @@ class DeepDLDS(torch.nn.Module):
     def __init__(self, input_size, output_size, num_subdyn, time_points, softmax_temperature=1):
         super().__init__()
 
-        in_size = input_size
-
         self.softmax_temperature = softmax_temperature
 
-        # no final activation function because we have a regression problem
         self.F = torch.nn.ParameterList()  # can't be a simple list
-        # self.coeffs = torch.nn.ParameterList() # TODO: create matrix of coefficients
+
         self.coeffs = torch.nn.Parameter(torch.tensor(
             np.ones((num_subdyn, time_points)), requires_grad=True))
 
         for i in range(num_subdyn):
-            f_i = slim.linear.BoundedNormLinear(
-                input_size, input_size, bias=True)
-            # f_i = torch.nn.Parameter(torch.randn( output_size, output_size))
-            # coefficients for each time point that have to be learned. initial value is 1
-            # c_i = torch.nn.Parameter(torch.ones(time_points))
-            self.F.append(f_i)
-            # self.coeffs.append(c_i)
 
-        # self.network = torch.nn.Sequential(*self.layers)
+            # torch init
+
+            f_i = slim.linear.SpectralLinear(
+                input_size, input_size, bias=False, sigma_max=1.0, sigma_min=0)
+            # initialize F
+            # f_i.apply(torch.nn.init.xavier_normal)
+            # torch.nn.init.xavier_uniform_(f_i.w)
+
+            self.F.append(f_i)
 
     def forward(self, x_t, t):
-        # this forward function is always called when we call the model (it's somewhere in __call__ method)
-        # F = self.F[i](X).view(-1, X.shape[1], X.shape[1])
 
-        # take an average over the batch dimension
-        # F = torch.mean(F, dim=0)
+        # _coeffs = self.soft_coeffs
 
-        # c = self.coeffs[i](X)
-        _coeffs = self.soft_coeffs
-
-        # combination of all f_i * c_i
-        y = torch.stack([_coeffs[i, t]*f_i(x_t)
+        # for f in self.F:
+        #    print(f.w)
+        #    print(linalg.eig(f.w.detach().numpy())[0])
+        # assert x_t.shape[0] == self.F[
+        #    0].in_features, f'x_t shape: {x_t.shape}, F shape: {self.F[0].in_features}'
+        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))
                         for i, f_i in enumerate(self.F)]).sum(dim=0)
         return y
 
     @property
     def soft_coeffs(self):
         return torch.nn.functional.softmax(self.coeffs / self.softmax_temperature, dim=0)
+
+    def multi_step(self):
+
+        _coeffs = self.soft_coeffs
+        Y = torch.zeros((self.step_ahead, self.input_size))
+        y0 = self.batch
+        Y[0, :] = y0
+
+        for t in range(self.step_ahead):
+            # combination of all f_i * c_i
+            y = torch.stack([_coeffs[i, t]*f_i(y0)
+                            for i, f_i in enumerate(self.F)]).sum(dim=0)
+            Y[t, :] = y
+            y0 = y
+
+        return Y
 
 
 class SimpleNN(torch.nn.Module):
@@ -75,8 +87,10 @@ class SimpleNN(torch.nn.Module):
 
         in_size = input_size
         self.layers = []
+
         # define multiple layers in a loop
         for hidden_size in hidden_sizes:
+            # linear layer computes output = input * weights + bias
             self.layers.append(torch.nn.Linear(in_size, hidden_size))
             self.layers.append(torch.nn.ReLU())
             in_size = hidden_size

@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -36,17 +37,19 @@ def main(args):
     data = TimeSeriesDataset(list(zip(X, y)))
 
     # create an iterable over our data, no shuffling because we want to keep the temporal information
-    train_loader = DataLoader(data, batch_size=32, shuffle=True)
+    train_loader = DataLoader(data, batch_size=args.batch_size, shuffle=True)
 
     # Build the model
     input_size = X.shape[1]
-    num_subdyn = 3
+    num_subdyn = args.num_subdyn
     output_size = y.shape[1]
     model = DeepDLDS(input_size, output_size, num_subdyn,
                      X.shape[0], softmax_temperature=0.0001)
 
     optimizer = torch.optim.Adam(
         model.parameters(), lr=args.lr)  # Adam optimizer
+
+    losses = []
 
     # training the model
     for epoch in range(args.epochs):
@@ -62,10 +65,7 @@ def main(args):
                     # if we call the model with the input, it will call the forward function
 
                     y_pred = model(batch[i], idx[i])  # forward pass
-                    coefficients = torch.cat(
-                        [c.view(-1) for c in model.coeffs])
-                    # regularization_term = sum(torch.linalg.norm(
-                    #    p, 1) for p in model.soft_coeffs)
+
                     regularization_term = model.coeffs.abs().sum()
 
                     # l2_reg = sum(p.pow(2).sum() for p in model.parameters())
@@ -76,19 +76,41 @@ def main(args):
                     # L1 norm of the difference
                     smooth_reg = coeff_delta.abs().sum()
 
+                    # add a penalty for when the eigenvalues are not in the unit circle
+                    f_sum = np.sum([model.coeffs[fidx, idx[i]].detach().numpy(
+                    )*f_i.effective_W().detach().numpy() for fidx, f_i in enumerate(model.F)], axis=0)
+                    eigenvalues = torch.linalg.eig(
+                        torch.tensor(f_sum, dtype=torch.float32))[0]
+                    # eigenvalues outside of unit circle are penalized
+                    eigenvalue = torch.abs(
+                        torch.abs(eigenvalues) - 1).sum()
+
+                    # add a penalty for when the eigenvalues are not close to the unit circle
+                    beta = 10
+                    penalty_eig = torch.abs((eigenvalues - 1)**2).sum()
+
+                    eigenvalue_penalty = 0.001
+
                     loss = dlds_loss(
-                        y_pred, target[i]) + args.reg * regularization_term + args.smooth * smooth_reg  # compute the loss
+                        y_pred, target[i].unsqueeze(0)) + args.reg * regularization_term + args.smooth * smooth_reg * input_size  # + eigenvalue_penalty * eigenvalue
                     # reset the gradients to zero before backpropagation to avoid accumulation
                     optimizer.zero_grad()
-                    loss.backward()  # backpropagation of the loss to compute the gradients
+                    # backpropagation of the loss to compute the gradients
+                    loss.backward(retain_graph=True)
                     optimizer.step()  # update the weights
 
-                    # tepoch.set_postfix(
-                    #    loss=loss.item(), accuracy=accuracy.item())
+                    tepoch.set_postfix(
+                        loss=loss.item())
 
-                # save the model
-                torch.save(model.state_dict(), os.path.join(
-                    args.model_path, 'model.pth'))
+            losses.append(loss.item())
+
+            # save the model
+            torch.save(model.state_dict(), os.path.join(
+                args.model_path, 'model.pth'))
+
+    # plot the losses
+    plt.plot(losses)
+    plt.show()
 
 
 def dlds_loss(y_pred, y_true):

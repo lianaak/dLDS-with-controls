@@ -9,8 +9,12 @@ import os
 import numpy as np
 from models import DeepDLDS
 import wandb
-import submitit
-import plotly.express as px
+import time
+
+from ax.service.ax_client import AxClient, ObjectiveProperties
+from ax.utils.notebook.plotting import render
+from ax.service.utils.report_utils import exp_to_df
+from submitit import AutoExecutor, LocalJob, DebugJob
 
 
 class TimeSeriesDataset(Dataset):
@@ -133,43 +137,8 @@ def main(args):
                 args.model_path, 'model.pth'))
 
     # plot the losses
-    # plt.plot(losses)
-    # plt.show()
-    # save the loss
-
-    print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
-    simple_model = DeepDLDS(input_size, input_size,
-                            num_subdyn, X.shape[1])
-    model = torch.load('models/model.pth', weights_only=False)
-    simple_model.load_state_dict(model)
-
-    # predict the next time step
-    X2_hat = []
-    with torch.no_grad():
-        for i in range(X.shape[1]):
-            y = simple_model(X[:, i], i)
-            X2_hat.append(y)
-
-    reg_string = str(args.reg).replace('.', '_')
-    smooth_string = str(args.smooth).replace('.', '_')
-
-    print(f'Storing visualizations...')
-
-    fig = px.line(
-        torch.stack(X2_hat).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
-    fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', engine="orca", width=900, height=450, scale=3)
-
-    # coefficients
-    coefficients = np.array([c.detach().numpy()
-                            for c in simple_model.coeffs])
-    fig = px.line(
-        coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
-    fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', engine="orca", width=900, height=450, scale=3)
-
-    np.save('loss.npy', loss)
-    return loss.item()
+    plt.plot(losses)
+    plt.show()
 
 
 def dlds_loss(y_pred, y_true):

@@ -7,6 +7,7 @@ __pycache__/
 *.npy
 # except
 !data.npy
+!As.npy
 *.png
 
 # virtualenv

@@ -32,8 +32,8 @@ def main(args):
             {"name": "reg", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
-                0.00001, 10.00001], "log_scale": True},
-            {"name": "num_subdyn", "type": "range", "bounds": [1, 5]}
+                0.00001, 10.00001], "log_scale": True}  # ,
+            # {"name": "num_subdyn", "type": "range", "bounds": [1, 5]}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
@@ -64,7 +64,7 @@ def main(args):
     print(f"Best values: {values}")
 
 
-def train_model(reg, smooth, num_subdyn):
+def train_model(reg, smooth, num_subdyn=2):
 
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
         str(reg) + ' --smooth ' + str(smooth) + ' --epochs ' + \

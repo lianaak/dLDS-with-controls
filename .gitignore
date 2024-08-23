@@ -20,3 +20,6 @@ dLDS_discrete/dlds_discrete/cdlds/models_temp_NN.py
 
 # models
 *.pth
+
+# wandb
+*wandb*

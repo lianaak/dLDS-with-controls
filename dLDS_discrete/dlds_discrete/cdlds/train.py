@@ -1,4 +1,6 @@
+from audioop import bias
 from matplotlib import pyplot as plt
+from sklearn.linear_model import RANSACRegressor
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -6,6 +8,7 @@ import argparse
 import os
 import numpy as np
 from models import DeepDLDS
+import wandb
 
 
 class TimeSeriesDataset(Dataset):
@@ -46,10 +49,37 @@ def main(args):
     model = DeepDLDS(input_size, output_size, num_subdyn,
                      X.shape[0], softmax_temperature=0.0001)
 
+    A = np.load('As.npy')
+
+    # initialize F with A
+    with torch.no_grad():
+        for idx, f in enumerate(model.F):
+            f.w = torch.tensor(A[idx], dtype=torch.float32)
+
+    # ransac = RANSACRegressor()
+    # ransac.fit(X, y)
+
+    # weights = ransac.estimator_.coef_
+    # bias = ransac.estimator_.intercept_
+
+    # for f in model.F:
+    #    f.w = torch.tensor(weights.T, dtype=torch.float32)
+
     optimizer = torch.optim.Adam(
         model.parameters(), lr=args.lr)  # Adam optimizer
 
     losses = []
+    # wandb.login()
+
+    # run = wandb.init(
+    # Set the project where this run will be logged
+    #    project="DeepDLDS",
+    # Track hyperparameters and run metadata
+    #    config={
+    #        "learning_rate": args.lr,
+    #        "epochs": args.epochs,
+    #    },
+    # )
 
     # training the model
     for epoch in range(args.epochs):
@@ -81,18 +111,9 @@ def main(args):
                     )*f_i.effective_W().detach().numpy() for fidx, f_i in enumerate(model.F)], axis=0)
                     eigenvalues = torch.linalg.eig(
                         torch.tensor(f_sum, dtype=torch.float32))[0]
-                    # eigenvalues outside of unit circle are penalized
-                    eigenvalue = torch.abs(
-                        torch.abs(eigenvalues) - 1).sum()
-
-                    # add a penalty for when the eigenvalues are not close to the unit circle
-                    beta = 10
-                    penalty_eig = torch.abs((eigenvalues - 1)**2).sum()
-
-                    eigenvalue_penalty = 0.001
 
                     loss = dlds_loss(
-                        y_pred, target[i].unsqueeze(0)) + args.reg * regularization_term + args.smooth * smooth_reg * input_size  # + eigenvalue_penalty * eigenvalue
+                        y_pred, target[i].unsqueeze(0)) + args.reg * regularization_term + args.smooth * smooth_reg * input_size
                     # reset the gradients to zero before backpropagation to avoid accumulation
                     optimizer.zero_grad()
                     # backpropagation of the loss to compute the gradients
@@ -101,6 +122,7 @@ def main(args):
 
                     tepoch.set_postfix(
                         loss=loss.item())
+                    # wandb.log({'loss': loss.item()})
 
             losses.append(loss.item())
 

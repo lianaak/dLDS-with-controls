@@ -3,21 +3,20 @@ from inspect import stack
 from locale import normalize
 from mimetypes import init
 from turtle import st
-from matplotlib.pylab import eig
 from networkx import sigma
 import numpy as np
 from pydmd import DMDc
-import util_controls as uc
 from dataclasses import dataclass
 from datasets import CdLDSDataGenerator
 from scipy import linalg
 from scipy.linalg import expm
 from sklearn import linear_model
-import util_controls as uc
+import util as uc
 import plotly.express as px
 import pylops
 import torch
 import slim
+from sklearn.linear_model import RANSACRegressor
 
 
 class DeepDLDS(torch.nn.Module):
@@ -30,7 +29,12 @@ class DeepDLDS(torch.nn.Module):
         self.F = torch.nn.ParameterList()  # can't be a simple list
 
         self.coeffs = torch.nn.Parameter(torch.tensor(
-            np.ones((num_subdyn, time_points)), requires_grad=True))
+            np.random.rand(num_subdyn, time_points), requires_grad=True))
+
+        self.Bias = torch.nn.Parameter(torch.tensor(
+            np.random.rand(num_subdyn, time_points), requires_grad=True))
+
+        self.Bias.data = torch.nn.functional.sigmoid(self.Bias.data)
 
         for i in range(num_subdyn):
 
@@ -45,15 +49,7 @@ class DeepDLDS(torch.nn.Module):
             self.F.append(f_i)
 
     def forward(self, x_t, t):
-
-        # _coeffs = self.soft_coeffs
-
-        # for f in self.F:
-        #    print(f.w)
-        #    print(linalg.eig(f.w.detach().numpy())[0])
-        # assert x_t.shape[0] == self.F[
-        #    0].in_features, f'x_t shape: {x_t.shape}, F shape: {self.F[0].in_features}'
-        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))
+        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0)) + self.Bias[i, t]
                         for i, f_i in enumerate(self.F)]).sum(dim=0)
         return y
 

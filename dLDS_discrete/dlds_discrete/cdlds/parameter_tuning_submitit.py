@@ -38,22 +38,41 @@ def main(args):
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
 
-    num_subdyn = args.num_subdyn
-    # loop over all hyperparameters
+    total_budget = 10
+    num_parallel_jobs = 3
 
-    for _ in range(10):  # Number of trials or iterations
-        # Get next parameters to evaluate
-        parameters, trial_index = ax_client.get_next_trial()
-        try:
+    jobs = []
+    submitted_jobs = 0
+
+    # Run until all the jobs have finished and our budget is used up.
+    while submitted_jobs < total_budget or jobs:
+        for job, trial_index in jobs[:]:
+            # Poll if any jobs completed
+            # Local and debug jobs don't run until .result() is called.
+            if job.done() or type(job) in [LocalJob, DebugJob]:
+                result = job.result()
+                ax_client.complete_trial(
+                    trial_index=trial_index, raw_data=result)
+                jobs.remove((job, trial_index))
+            # Get next parameters to evaluate
+
+            # Schedule new jobs if there is availablity
+        trial_index_to_param, _ = ax_client.get_next_trials(
+            max_trials=min(num_parallel_jobs - len(jobs), total_budget - submitted_jobs))
+        for trial_index, parameters in trial_index_to_param.items():
+
             # Submit the job and wait for result
-            accuracy = evaluate_parameterization(parameters)
+            job = evaluate_parameterization(parameters)
+            submitted_jobs += 1
+            jobs.append((job, trial_index))
+            time.sleep(1)
             # Complete the trial with obtained result
-            ax_client.complete_trial(trial_index=trial_index, raw_data={
-                                     "accuracy": (accuracy, 0.0)})  # 0.0 as standard error
-        except Exception as e:
-            print(f"Failed trial with error: {e}")
-            ax_client.log_trial_failure(
-                trial_index=trial_index)  # Log failed trial
+            # ax_client.complete_trial(trial_index=trial_index, raw_data={
+            #                         "accuracy": (accuracy, 0.0)})  # 0.0 as standard error
+
+        # Sleep for a bit before checking the jobs again to avoid overloading the cluster.
+        # If you have a large number of jobs, consider adding a sleep statement in the job polling loop aswell.
+        time.sleep(30)
 
     # Save the experiment
     ax_client.save_to_json_file("experiment.json")
@@ -102,7 +121,7 @@ def evaluate_parameterization(parameterization):
     smooth = parameterization["smooth"]
 
     job = submitit_job(reg, smooth)
-    return job.result()  # Wait for job to complete and get result
+    return job  # Wait for job to complete and get result
 
 
 if __name__ == '__main__':

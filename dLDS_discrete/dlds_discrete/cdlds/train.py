@@ -152,12 +152,12 @@ def main(args):
     fig = px.line(
         torch.stack(X2_hat).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', engine="orca", width=900, height=450, scale=3)
+        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     fig = px.line(
         torch.stack(X2_hat_multi).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', engine="orca", width=900, height=450, scale=3)
+        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
     # coefficients
     coefficients = np.array([c.detach().numpy()
@@ -165,7 +165,7 @@ def main(args):
     fig = px.line(
         coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', engine="orca", width=900, height=450, scale=3)
+        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
     np.save('loss.npy', loss.item())
     return loss.item()

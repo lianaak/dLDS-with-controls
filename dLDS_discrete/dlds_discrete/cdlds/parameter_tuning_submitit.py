@@ -60,11 +60,8 @@ def main(args):
 
     # Get best parameters
     best_parameters, values = ax_client.get_best_parameters()
-
-    # Store best parameters
-    with open('best_parameters.txt', 'w') as f:
-        f.write(f"Best parameters: {best_parameters}")
-        f.write(f"Best values: {values}")
+    print(f"Best parameters: {best_parameters}")
+    print(f"Best values: {values}")
 
 
 def train_model(reg, smooth, num_subdyn=2):
@@ -84,9 +81,12 @@ def submitit_job(reg, smooth):
     # Directory for Submitit logs
     executor = AutoExecutor(folder="submitit_jobs")
     executor.update_parameters(
-        timeout_min=60  # ,  # Timeout for each job in minutes
+        timeout_min=60,  # Timeout for each job in minutes
+        cpus_per_task=4,  # Request 4 CPUs per job
+        mem_gb=16,  # Request 16 GB of memory per job
+        nodes=1,  # Number of nodes
         # slurm_partition="dev",  # Replace with your SLURM partition name
-        # gpus_per_node=1,  # Number of GPUs if required
+        gpus_per_node=1,  # Number of GPUs if required
     )
 
     job = executor.submit(train_model, reg, smooth)

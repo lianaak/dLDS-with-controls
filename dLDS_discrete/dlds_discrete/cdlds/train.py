@@ -11,6 +11,7 @@ from models import DeepDLDS
 import wandb
 import submitit
 import plotly.express as px
+import util
 
 
 class TimeSeriesDataset(Dataset):
@@ -140,11 +141,8 @@ def main(args):
     print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
 
     # predict the next time step
-    X2_hat = []
-    with torch.no_grad():
-        for i in range(X.shape[1]):
-            y = model(X[:, i], i)
-            X2_hat.append(y)
+    X2_hat = util.single_step(X, model)
+    X2_hat_multi = util.multi_step(X, model)
 
     reg_string = str(args.reg).replace('.', '_')
     smooth_string = str(args.smooth).replace('.', '_')
@@ -156,6 +154,11 @@ def main(args):
     fig.write_image(
         f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', engine="orca", width=900, height=450, scale=3)
 
+    fig = px.line(
+        torch.stack(X2_hat_multi).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
+    fig.write_image(
+        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', engine="orca", width=900, height=450, scale=3)
+
     # coefficients
     coefficients = np.array([c.detach().numpy()
                             for c in model.coeffs])
@@ -164,7 +167,7 @@ def main(args):
     fig.write_image(
         f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', engine="orca", width=900, height=450, scale=3)
 
-    np.save('loss.npy', loss)
+    np.save('loss.npy', loss.item())
     return loss.item()
 
 

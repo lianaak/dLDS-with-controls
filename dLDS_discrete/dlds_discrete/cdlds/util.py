@@ -23,8 +23,8 @@ def single_step(X, model):
     # predict the next time step
     X_hat = []
     with torch.no_grad():
-        for i in range(X.shape[1]):
-            y = model(X[:, i], i)
+        for i in range(X.shape[0]):
+            y = model(X[i, :], i)
             X_hat.append(y)
     return X_hat
 
@@ -32,9 +32,9 @@ def single_step(X, model):
 def multi_step(X, model):
     # predict all time steps from initial state
     X_hat = []
-    X_hat.append(X[:, 0])
+    X_hat.append(X[0, :].unsqueeze(0))
     with torch.no_grad():
-        for i in range(X.shape[1]):
+        for i in range(X.shape[0]):
             y = model(X_hat[-1].squeeze(), i)
             X_hat.append(y)
     return X_hat

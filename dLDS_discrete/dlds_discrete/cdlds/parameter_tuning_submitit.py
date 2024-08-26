@@ -52,7 +52,7 @@ def main(args):
             if job.done() or type(job) in [LocalJob, DebugJob]:
                 result = job.result()
                 ax_client.complete_trial(
-                    trial_index=trial_index, raw_data=result)
+                    trial_index=trial_index, raw_data={"loss": (result, 0.0)})
                 jobs.remove((job, trial_index))
             # Get next parameters to evaluate
 

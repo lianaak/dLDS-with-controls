@@ -60,16 +60,19 @@ def main(args):
 
     # Get best parameters
     best_parameters, values = ax_client.get_best_parameters()
-    print(f"Best parameters: {best_parameters}")
-    print(f"Best values: {values}")
+
+    # Store best parameters
+    with open('best_parameters.txt', 'w') as f:
+        f.write(f"Best parameters: {best_parameters}")
+        f.write(f"Best values: {values}")
 
 
-def train_model(reg, smooth, num_subdyn=2):
+def train_model(reg, smooth):
 
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
         str(reg) + ' --smooth ' + str(smooth) + ' --epochs ' + \
         str(args.epochs) + ' --lr ' + str(args.lr) + \
-        ' --num_subdyn ' + str(num_subdyn)
+        ' --num_subdyn ' + str(args.num_subdyn)
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')
@@ -81,11 +84,10 @@ def submitit_job(reg, smooth):
     # Directory for Submitit logs
     executor = AutoExecutor(folder="submitit_jobs")
     executor.update_parameters(
-        timeout_min=60,  # Timeout for each job in minutes
+        timeout_min=60,
         cpus_per_task=4,  # Request 4 CPUs per job
         mem_gb=16,  # Request 16 GB of memory per job
-        nodes=1,  # Number of nodes
-        # slurm_partition="dev",  # Replace with your SLURM partition name
+        nodes=1,  # Number of nodes to request
         gpus_per_node=1,  # Number of GPUs if required
     )
 

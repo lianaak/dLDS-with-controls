@@ -86,10 +86,10 @@ def main(args):
         f.write(f"Best values: {values}")
 
 
-def train_model(reg, smooth):
+def train_model(parameters):
 
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
-        str(reg) + ' --smooth ' + str(smooth) + ' --epochs ' + \
+        str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(args.epochs) + ' --lr ' + str(args.lr) + \
         ' --num_subdyn ' + str(args.num_subdyn)
     os.system(command)

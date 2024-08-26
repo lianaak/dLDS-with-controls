@@ -60,8 +60,11 @@ def main(args):
 
     # Get best parameters
     best_parameters, values = ax_client.get_best_parameters()
-    print(f"Best parameters: {best_parameters}")
-    print(f"Best values: {values}")
+
+    # Store best parameters
+    with open('best_parameters.txt', 'w') as f:
+        f.write(f"Best parameters: {best_parameters}")
+        f.write(f"Best values: {values}")
 
 
 def train_model(reg, smooth, num_subdyn=2):

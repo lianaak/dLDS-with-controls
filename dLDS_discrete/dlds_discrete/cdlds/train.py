@@ -138,16 +138,12 @@ def main(args):
     # save the loss
 
     print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
-    simple_model = DeepDLDS(input_size, input_size,
-                            num_subdyn, X.shape[1])
-    model = torch.load('models/model.pth', weights_only=False)
-    simple_model.load_state_dict(model)
 
     # predict the next time step
     X2_hat = []
     with torch.no_grad():
         for i in range(X.shape[1]):
-            y = simple_model(X[:, i], i)
+            y = model(X[:, i], i)
             X2_hat.append(y)
 
     reg_string = str(args.reg).replace('.', '_')
@@ -162,7 +158,7 @@ def main(args):
 
     # coefficients
     coefficients = np.array([c.detach().numpy()
-                            for c in simple_model.coeffs])
+                            for c in model.coeffs])
     fig = px.line(
         coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(

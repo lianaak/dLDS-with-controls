@@ -62,7 +62,7 @@ def main(args):
         for trial_index, parameters in trial_index_to_param.items():
 
             # Submit the job and wait for result
-            job = evaluate_parameterization(parameters)
+            job = submitit_job(parameters)
             submitted_jobs += 1
             jobs.append((job, trial_index))
             time.sleep(1)
@@ -99,7 +99,7 @@ def train_model(reg, smooth):
     return loss
 
 
-def submitit_job(reg, smooth):
+def submitit_job(parameters):
     # Directory for Submitit logs
     executor = AutoExecutor(folder="submitit_jobs")
     executor.update_parameters(
@@ -110,25 +110,17 @@ def submitit_job(reg, smooth):
         gpus_per_node=1,  # Number of GPUs if required
     )
 
-    job = executor.submit(train_model, reg, smooth)
+    job = executor.submit(train_model, parameters)
     return job
 
 # Assuming ax_client is already initialized as shown in step 2
-
-
-def evaluate_parameterization(parameterization):
-    reg = parameterization["reg"]
-    smooth = parameterization["smooth"]
-
-    job = submitit_job(reg, smooth)
-    return job  # Wait for job to complete and get result
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default='data/data.npy')
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--num_subdyn', type=int, default=1)
+    parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=20)
     args = parser.parse_args()
     print(args)

@@ -33,8 +33,6 @@ def main(args):
                 0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
-            {"name": "eigenvalue_radius", "type": "range", "bounds": [
-                0.9, 0.9999], "value_type": "float"},
             {"name": "num_subdyn", "type": "range",
                 "bounds": [1, 3], "value_type": "int"}
         ],
@@ -88,8 +86,11 @@ def main(args):
 
 def train_model(parameters):
 
+    fix_point_change = False
+    eigenvalue_radius = 0.995
+
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=parameters['num_subdyn'], D_control=0, fix_point_change=False, eigenvalue_radius=parameters['eigenvalue_radius']))
+        K=parameters['num_subdyn'], D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=eigenvalue_radius))
 
     time_points = 1000
 
@@ -108,7 +109,9 @@ def train_model(parameters):
         str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(args.epochs) + ' --lr ' + str(args.lr) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
-        args.dynamics_path + ' --state_path ' + args.state_path
+        args.dynamics_path + ' --state_path ' + args.state_path + \
+        ' --fix_point_change ' + \
+        str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius)
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')

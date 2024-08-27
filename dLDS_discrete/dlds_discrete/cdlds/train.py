@@ -75,11 +75,17 @@ def main(args):
     losses = []
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
+    if args.eigenvalue_radius < 0.995:
+        project_name = f"Oscillatory_FastDecay"
+    else:
+        project_name = f"Oscillatory_SlowDecay"
+
     run = wandb.init(
         # Set the project where this run will be logged
-        project="DeepDLDS",
+        project=f"{project_name}_{str(args.num_subdyn)}_State",
+        # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
-        name=f"state{str(args.num_subdyn)}_reg{str(args.reg)}_smooth{str(args.smooth)}_nofixpoint",
+        name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
@@ -150,7 +156,7 @@ def main(args):
         os.makedirs(visualizations_path)
 
     saving_path = visualizations_path + \
-        '\\state'+str(args.num_subdyn)+'_nofixpoint'
+        '/state'+str(args.num_subdyn)+'_nofixpoint'
 
     if not os.path.exists(saving_path):
         os.makedirs(saving_path)
@@ -163,14 +169,14 @@ def main(args):
     fig = px.line(
         X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
+        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     wandb.log({'single-step residuals': fig})
 
     fig = px.line(
         X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
+        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
     wandb.log({'multi-step residuals': fig})
 
@@ -180,7 +186,7 @@ def main(args):
     fig = px.line(
         coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
+        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
     # log the plots to wandb
     wandb.log({'coefficients': fig})
@@ -208,6 +214,8 @@ if __name__ == '__main__':
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')
+    parser.add_argument('--fix_point_change', type=bool, default=False),
+    parser.add_argument('--eigenvalue_radius', type=float, default=0.995)
     args = parser.parse_args()
     print(args)
     main(args)

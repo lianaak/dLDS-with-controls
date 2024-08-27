@@ -32,7 +32,9 @@ def main(args):
             {"name": "reg", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
-                0.00001, 10.00001], "log_scale": True}  # ,
+                0.00001, 10.00001], "log_scale": True},
+            {"name": "eigenvalue_radius", "type": "range", "bounds": [
+                0.9, 0.9999], "log_scale": True}  # ,
             # {"name": "num_subdyn", "type": "range", "bounds": [1, 5]}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
@@ -88,10 +90,27 @@ def main(args):
 
 def train_model(parameters):
 
+    generator = DLDSwithControl(CdLDSDataGenerator(
+        K=1, D_control=0, fix_point_change=False, eigenvalue_radius=parameters['eigenvalue_radius']))
+
+    time_points = 1000
+
+    # generate toy data
+    X = generator.datasets.generate_data(time_points, sigma=0.01)
+
+    # z-score normalization
+    # X = (X - X.mean(axis=0)) / X.std(axis=0)
+    np.save(args.data_path, X)
+    # save the As of the model
+    np.save(args.dynamics_path, np.array(generator.datasets.A))
+
+    np.save(args.state_path, generator.datasets.z_)
+
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
         str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(args.epochs) + ' --lr ' + str(args.lr) + \
-        ' --num_subdyn ' + str(args.num_subdyn)
+        ' --num_subdyn ' + str(args.num_subdyn) + ' --dynamics_path ' + \
+        args.dynamics_path + ' --state_path ' + args.state_path
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')
@@ -122,6 +141,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--dynamics_path', type=str, default='As.npy')
+    parser.add_argument('--state_path', type=str, default='states.npy')
     args = parser.parse_args()
     print(args)
     main(args)

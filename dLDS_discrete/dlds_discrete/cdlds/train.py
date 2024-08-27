@@ -52,7 +52,8 @@ def main(args):
     model = DeepDLDS(input_size, output_size, num_subdyn,
                      X.shape[0], softmax_temperature=0.0001)
 
-    A = np.load('As.npy')
+    A = np.load(args.dynamics_path)
+    states = np.load(args.state_path)
 
     # initialize F with A
     with torch.no_grad():
@@ -72,17 +73,17 @@ def main(args):
         model.parameters(), lr=args.lr)  # Adam optimizer
 
     losses = []
-    # wandb.login()
+    wandb.login()
 
-    # run = wandb.init(
-    # Set the project where this run will be logged
-    #    project="DeepDLDS",
-    # Track hyperparameters and run metadata
-    #    config={
-    #        "learning_rate": args.lr,
-    #        "epochs": args.epochs,
-    #    },
-    # )
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project="DeepDLDS",
+        # Track hyperparameters and run metadata
+        config={
+            "learning_rate": args.lr,
+            "epochs": args.epochs,
+        },
+    )
 
     # training the model
     for epoch in range(args.epochs):
@@ -125,7 +126,6 @@ def main(args):
 
                     tepoch.set_postfix(
                         loss=loss.item())
-                    # wandb.log({'loss': loss.item()})
 
             losses.append(loss.item())
 
@@ -150,12 +150,12 @@ def main(args):
     print(f'Storing visualizations...')
 
     fig = px.line(
-        torch.stack(X2_hat).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
+        torch.stack(X2_hat).squeeze(), title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
         f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     fig = px.line(
-        torch.stack(X2_hat_multi).squeeze(), title=f'Prediction with reg_term={args.reg}, smooth={args.smooth}')
+        torch.stack(X2_hat_multi).squeeze(), title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
         f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
@@ -167,7 +167,9 @@ def main(args):
     fig.write_image(
         f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
-    np.save('loss.npy', loss.item())
+    np.save(
+        f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())
+    wandb.log({'loss': loss.item()})
     return loss.item()
 
 
@@ -185,6 +187,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_subdyn', type=int, default=3)
     parser.add_argument('--reg', type=float, default=0.0001)
     parser.add_argument('--smooth', type=float, default=0.0001)
+    parser.add_argument('--dynamics_path', type=str, default='As.npy')
+    parser.add_argument('--state_path', type=str, default='states.npy')
     args = parser.parse_args()
     print(args)
     main(args)

@@ -2,10 +2,11 @@ from inspect import stack
 from locale import normalize
 from mimetypes import init
 from turtle import st
+from attrs import field
 from networkx import sigma
 import numpy as np
 from pydmd import DMDc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datasets import CdLDSDataGenerator
 from scipy import linalg
 from scipy.linalg import expm
@@ -116,7 +117,7 @@ class DLDSwithControl:
         The sub-dynamics of the model
     """
 
-    datasets: CdLDSDataGenerator = CdLDSDataGenerator()
+    datasets: CdLDSDataGenerator = field(default_factory=CdLDSDataGenerator)
     X: np.ndarray = None
     num_true_dim: int = None
     num_subdyns: int = None

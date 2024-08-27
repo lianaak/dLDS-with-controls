@@ -79,7 +79,7 @@ def main(args):
         # Set the project where this run will be logged
         project="DeepDLDS",
         # name of the run is a combination of the model name and a timestamp
-        name=f"state"+str(args.num_subdyn)+'nofixpoint',
+        name=f"state{str(args.num_subdyn)}_reg{str(args.reg)}_smooth{str(args.smooth)}_nofixpoint",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
@@ -128,6 +128,8 @@ def main(args):
                         loss=loss.item())
 
             losses.append(loss.item())
+
+            wandb.log({'loss': loss.item()})
 
             # save the model
             torch.save(model.state_dict(), os.path.join(
@@ -187,7 +189,6 @@ def main(args):
     #    f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())
     np.save('loss.npy', loss.item())
 
-    wandb.log({'loss': loss.item()})
     return loss.item()
 
 

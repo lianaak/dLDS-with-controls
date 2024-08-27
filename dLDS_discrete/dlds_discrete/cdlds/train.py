@@ -73,11 +73,13 @@ def main(args):
         model.parameters(), lr=args.lr)  # Adam optimizer
 
     losses = []
-    wandb.login()
+    wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
     run = wandb.init(
         # Set the project where this run will be logged
         project="DeepDLDS",
+        # name of the run is a combination of the model name and a timestamp
+        name=f"state"+str(args.num_subdyn)+'nofixpoint',
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
@@ -93,7 +95,7 @@ def main(args):
 
             # iterate over the data loader which will return a batch of data and target
             for (batch, target), idx in tepoch:
-                # print(idx)
+
                 tepoch.set_description(f'Epoch {epoch}')
                 for i in range(len(batch)):
                     # if we call the model with the input, it will call the forward function
@@ -101,8 +103,6 @@ def main(args):
                     y_pred = model(batch[i], idx[i])  # forward pass
 
                     regularization_term = model.coeffs.abs().sum()
-
-                    # l2_reg = sum(p.pow(2).sum() for p in model.parameters())
 
                     # Difference between t and t-1 of the coefficients
                     coeff_delta = model.coeffs[:,
@@ -133,11 +133,6 @@ def main(args):
             torch.save(model.state_dict(), os.path.join(
                 args.model_path, 'model.pth'))
 
-    # plot the losses
-    # plt.plot(losses)
-    # plt.show()
-    # save the loss
-
     print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
 
     # predict the next time step
@@ -153,22 +148,29 @@ def main(args):
         os.makedirs(visualizations_path)
 
     saving_path = visualizations_path + \
-        f'state'+str(args.num_subdyn)+'nofixpoint'
+        '\\state'+str(args.num_subdyn)+'_nofixpoint'
 
     if not os.path.exists(saving_path):
         os.makedirs(saving_path)
 
     print(f'Storing visualizations...')
 
-    fig = px.line(
-        torch.stack(X2_hat).squeeze(), title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
-    fig.write_image(
-        saving_path+f'/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
+    X2_hat_residuals = torch.stack(X2_hat).squeeze() - y
+    X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = px.line(
-        torch.stack(X2_hat_multi).squeeze(), title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
+        X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        saving_path+f'/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
+        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
+
+    wandb.log({'single-step residuals': fig})
+
+    fig = px.line(
+        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
+    fig.write_image(
+        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
+
+    wandb.log({'multi-step residuals': fig})
 
     # coefficients
     coefficients = np.array([c.detach().numpy()
@@ -176,7 +178,10 @@ def main(args):
     fig = px.line(
         coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        saving_path+f'+/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
+        f'{saving_path}\\reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
+
+    # log the plots to wandb
+    wandb.log({'coefficients': fig})
 
     # np.save(
     #    f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())

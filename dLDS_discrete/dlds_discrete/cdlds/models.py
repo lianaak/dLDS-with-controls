@@ -49,7 +49,7 @@ class DeepDLDS(torch.nn.Module):
             self.F.append(f_i)
 
     def forward(self, x_t, t):
-        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0)) + self.Bias[i, t]
+        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))  # + self.Bias[i, t]
                         for i, f_i in enumerate(self.F)]).sum(dim=0)
         return y
 

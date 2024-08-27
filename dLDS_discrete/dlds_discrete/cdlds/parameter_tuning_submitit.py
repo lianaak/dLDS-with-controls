@@ -111,7 +111,7 @@ def train_model(parameters):
 
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
         str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
-        str(args.epochs) + ' --lr ' + str(args.lr) + \
+        str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
         args.dynamics_path + ' --state_path ' + args.state_path + \
         ' --fix_point_change ' + \

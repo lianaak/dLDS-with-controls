@@ -1,4 +1,3 @@
-from imp import init_builtin
 from inspect import stack
 from locale import normalize
 from mimetypes import init

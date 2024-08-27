@@ -34,7 +34,11 @@ def main(args):
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "num_subdyn", "type": "range",
-                "bounds": [1, 3], "value_type": "int"}
+                "bounds": [1, 3], "value_type": "int"},
+            {"name": "learning_rate", "type": "range", "bounds": [
+                0.00001, 0.1], "log_scale": True},
+            {"name": "epochs", "type": "range", "bounds": [
+                1, 50], "value_type": "int"}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
@@ -87,7 +91,7 @@ def main(args):
 def train_model(parameters):
 
     fix_point_change = False
-    eigenvalue_radius = 0.995
+    eigenvalue_radius = 0.999
 
     generator = DLDSwithControl(CdLDSDataGenerator(
         K=parameters['num_subdyn'], D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=eigenvalue_radius))

@@ -62,7 +62,7 @@ def main(args):
 
         # initialize coefficients with ones
         model.coeffs = torch.nn.Parameter(torch.ones(
-            (num_subdyn, input_size), dtype=torch.float32))
+            ((num_subdyn, input_size)), dtype=torch.float32))
 
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)

@@ -34,8 +34,9 @@ def main(args):
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "eigenvalue_radius", "type": "range", "bounds": [
-                0.9, 0.9999], "log_scale": True}  # ,
-            # {"name": "num_subdyn", "type": "range", "bounds": [1, 5]}
+                0.9, 0.9999], "value_type": "float"},
+            {"name": "num_subdyn", "type": "range",
+                "bounds": [1, 3], "value_type": "int"}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
@@ -68,9 +69,6 @@ def main(args):
             submitted_jobs += 1
             jobs.append((job, trial_index))
             time.sleep(1)
-            # Complete the trial with obtained result
-            # ax_client.complete_trial(trial_index=trial_index, raw_data={
-            #                         "accuracy": (accuracy, 0.0)})  # 0.0 as standard error
 
         # Sleep for a bit before checking the jobs again to avoid overloading the cluster.
         # If you have a large number of jobs, consider adding a sleep statement in the job polling loop aswell.
@@ -91,7 +89,7 @@ def main(args):
 def train_model(parameters):
 
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=1, D_control=0, fix_point_change=False, eigenvalue_radius=parameters['eigenvalue_radius']))
+        K=parameters['num_subdyn'], D_control=0, fix_point_change=False, eigenvalue_radius=parameters['eigenvalue_radius']))
 
     time_points = 1000
 
@@ -109,7 +107,7 @@ def train_model(parameters):
     command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
         str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(args.epochs) + ' --lr ' + str(args.lr) + \
-        ' --num_subdyn ' + str(args.num_subdyn) + ' --dynamics_path ' + \
+        ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
         args.dynamics_path + ' --state_path ' + args.state_path
     os.system(command)
     # get the loss
@@ -139,7 +137,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default='data/data.npy')
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')

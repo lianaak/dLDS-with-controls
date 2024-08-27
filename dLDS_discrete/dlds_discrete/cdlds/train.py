@@ -147,17 +147,28 @@ def main(args):
     reg_string = str(args.reg).replace('.', '_')
     smooth_string = str(args.smooth).replace('.', '_')
 
+    # if folder does not exist, create it
+    visualizations_path = 'visualizations/hyperparameters'
+    if not os.path.exists(visualizations_path):
+        os.makedirs(visualizations_path)
+
+    saving_path = visualizations_path + \
+        f'state'+str(args.num_subdyn)+'nofixpoint'
+
+    if not os.path.exists(saving_path):
+        os.makedirs(saving_path)
+
     print(f'Storing visualizations...')
 
     fig = px.line(
         torch.stack(X2_hat).squeeze(), title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
+        saving_path+f'/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     fig = px.line(
         torch.stack(X2_hat_multi).squeeze(), title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
+        saving_path+f'/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
     # coefficients
     coefficients = np.array([c.detach().numpy()
@@ -165,10 +176,12 @@ def main(args):
     fig = px.line(
         coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
     fig.write_image(
-        f'visualizations/hyperparameters/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
+        saving_path+f'+/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
-    np.save(
-        f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())
+    # np.save(
+    #    f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())
+    np.save('loss.npy', loss.item())
+
     wandb.log({'loss': loss.item()})
     return loss.item()
 
@@ -181,10 +194,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default='models/')
     parser.add_argument('--data_path', type=str, default='data.npy')
-    parser.add_argument('--epochs', type=int, default=11)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--num_subdyn', type=int, default=3)
+    parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--reg', type=float, default=0.0001)
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')

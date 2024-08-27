@@ -60,10 +60,6 @@ def main(args):
         for idx, f in enumerate(model.F):
             f.w = torch.tensor(A[idx], dtype=torch.float32)
 
-        # initialize coefficients with ones
-        model.coeffs = torch.nn.Parameter(torch.ones(
-            ((num_subdyn, input_size)), dtype=torch.float32))
-
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)
 

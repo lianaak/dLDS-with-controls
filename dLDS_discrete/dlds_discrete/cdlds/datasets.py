@@ -196,7 +196,7 @@ class CdLDSDataGenerator:
         X_reconstructed = np.zeros((D, n_time_points))
         X_reconstructed[:, 0] = X0
 
-        for t in range(1, n_time_points-1):
+        for t in range(1, n_time_points):
             X_reconstructed[:, t] = self.single_step_reconstruction(
                 x=X_reconstructed[:, t-1], A=A[z[t]], B=B, u=U[:, t-1])
 

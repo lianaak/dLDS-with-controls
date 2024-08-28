@@ -1,0 +1,2 @@
+Namespace(model_path='models/', data_path='data.npy', epochs=50, batch_size=999, lr=0.001, num_subdyn=1, reg=0.0001, smooth=0.0001, dynamics_path='As.npy', state_path='states.npy', fix_point_change=False, eigenvalue_radius=0.995)
+Problem at: C:\Users\LAK\Documents\dLDS-with-controls\dLDS_discrete\dlds_discrete\cdlds\train.py 94 main

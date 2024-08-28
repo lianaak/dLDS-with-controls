@@ -44,18 +44,22 @@ class DeepDLDS(torch.nn.Module):
 
             # torch init
 
-            f_i = slim.linear.SpectralLinear(
+            f_i = slim.linear.BoundedNormLinear(
                 input_size, input_size, bias=False, sigma_max=1.0, sigma_min=0)
+
             # initialize F
-            # f_i.apply(torch.nn.init.xavier_normal)
-            # torch.nn.init.xavier_uniform_(f_i.w)
+            # f_i.(torch.nn.init.xavier_normal)
 
             self.F.append(f_i)
 
     def forward(self, x_t, t):
-        y = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))  # + self.Bias[i, t]
-                        for i, f_i in enumerate(self.F)]).sum(dim=0)
-        return y
+        # print(f'coefficients:{self.coeffs[0, t]}')
+        # print(f'F output:{self.F[0].weight}')
+        # print(f'x input:{x_t}')
+        # print(f'F output:{self.F[0](x_t)}')
+        y_t = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))  # + self.Bias[i, t]
+                           for i, f_i in enumerate(self.F)]).sum(dim=0)
+        return y_t
 
     @property
     def soft_coeffs(self):

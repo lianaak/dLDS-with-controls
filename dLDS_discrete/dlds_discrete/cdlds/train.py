@@ -58,7 +58,10 @@ def main(args):
     # initialize F with A
     with torch.no_grad():
         for idx, f in enumerate(model.F):
-            f.w = torch.tensor(A[idx], dtype=torch.float32)
+
+            # decompose A with SVD
+            f.linear.weight = torch.nn.Parameter(
+                torch.tensor(A[idx], dtype=torch.float32))
 
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)
@@ -101,47 +104,61 @@ def main(args):
 
             # iterate over the data loader which will return a batch of data and target
             for (batch, target), idx in tepoch:
+                y_pred = torch.zeros(len(batch), input_size)
 
                 tepoch.set_description(f'Epoch {epoch}')
+
                 for i in range(len(batch)):
                     # if we call the model with the input, it will call the forward function
+                    # print('batch')
+                    # print(f'batch {batch[i]}')
+                    y_pred[i] = model(batch[i], idx[i])  # forward pass
 
-                    y_pred = model(batch[i], idx[i])  # forward pass
+                regularization_term = model.coeffs.abs().sum()
 
-                    regularization_term = model.coeffs.abs().sum()
+                # Difference between t and t-1 of the coefficients
+                coeff_delta = model.coeffs[:,
+                                           1:] - model.coeffs[:, :-1]
+                # L1 norm of the difference
+                smooth_reg = coeff_delta.abs().sum()
 
-                    # Difference between t and t-1 of the coefficients
-                    coeff_delta = model.coeffs[:,
-                                               1:] - model.coeffs[:, :-1]
-                    # L1 norm of the difference
-                    smooth_reg = coeff_delta.abs().sum()
+                # print(f'prediction {y_pred}')
+                # print(target)
 
-                    # add a penalty for when the eigenvalues are not in the unit circle
-                    f_sum = np.sum([model.coeffs[fidx, idx[i]].detach().numpy(
-                    )*f_i.effective_W().detach().numpy() for fidx, f_i in enumerate(model.F)], axis=0)
-                    eigenvalues = torch.linalg.eig(
-                        torch.tensor(f_sum, dtype=torch.float32))[0]
+                eigenvalue_reg = torch.stack(
+                    [f_i.reg_error() for f_i in model.F], axis=0).sum()
 
-                    loss = dlds_loss(
-                        y_pred, target[i].unsqueeze(0)) + args.reg * regularization_term + args.smooth * smooth_reg * input_size
-                    # reset the gradients to zero before backpropagation to avoid accumulation
-                    optimizer.zero_grad()
-                    # backpropagation of the loss to compute the gradients
-                    loss.backward(retain_graph=True)
-                    optimizer.step()  # update the weights
+                loss = dlds_loss(
+                    y_pred, target) + args.reg * regularization_term + args.smooth * smooth_reg * input_size
 
-                    tepoch.set_postfix(
-                        loss=loss.item())
+                loss += eigenvalue_reg
+                # reset the gradients to zero before backpropagation to avoid accumulation
+                optimizer.zero_grad()
+                # backpropagation of the loss to compute the gradients
+                loss.backward(retain_graph=True)
+                optimizer.step()  # update the weights
+
+                tepoch.set_postfix(
+                    loss=loss.item())
 
             losses.append(loss.item())
 
             wandb.log({'loss': loss.item()})
-
-            # save the model
-            torch.save(model.state_dict(), os.path.join(
-                args.model_path, 'model.pth'))
+    # save the model
+    torch.save(model.state_dict(), os.path.join(
+        args.model_path, 'model.pth'))
 
     print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
+
+    # add a penalty for when the eigenvalues are not in the unit circle
+    # f_sum = np.sum([model.coeffs[fidx, idx[i]].detach().numpy(
+    # )*f_i.effective_W().detach().numpy() for fidx, f_i in enumerate(model.F)], axis=0)
+    # eigenvalues = torch.linalg.eig(
+    #    torch.tensor(f_sum, dtype=torch.float32))[0]
+
+    # print(eigenvalues)
+
+    # print(model.coeffs)
 
     # predict the next time step
     X2_hat = util.single_step(X, model)
@@ -193,9 +210,10 @@ def main(args):
 
     # np.save(
     #    f'losses/reg_{reg_string}_smooth_{smooth_string}_loss.npy', loss.item())
-    np.save('loss.npy', loss.item())
+    # np.save('loss.npy', loss.item())
 
-    return loss.item()
+    # return loss.item()
+    return losses
 
 
 def dlds_loss(y_pred, y_true):

@@ -129,7 +129,7 @@ def submitit_job(parameters):
     executor.update_parameters(
         timeout_min=60,
         cpus_per_task=4,  # Request 4 CPUs per job
-        mem_gb=16,  # Request 16 GB of memory per job
+        mem_gb=32,  # Request 16 GB of memory per job
         nodes=1,  # Number of nodes to request
         gpus_per_node=1,  # Number of GPUs if required
     )

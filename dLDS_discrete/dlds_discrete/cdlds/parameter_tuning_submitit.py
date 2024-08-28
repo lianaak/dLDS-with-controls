@@ -100,24 +100,24 @@ def train_model(parameters):
     # z-score normalization
     # X = (X - X.mean(axis=0)) / X.std(axis=0)
 
-    job_id = os.environ['SUBMITIT_JOB_ID']
+    run_id = np.random.randint(0, 1000)
 
     # save the data for each job
     if args.data_path is None:
-        data_path = f'data_{job_id}.npy'
+        data_path = f'data_{run_id}.npy'
     else:
         data_path = args.data_path
     np.save(data_path, X)
 
     if args.dynamics_path is None:
-        dynamics_path = f'As_{job_id}.npy'
+        dynamics_path = f'As_{run_id}.npy'
     else:
         dynamics_path = args.dynamics_path
     # save the As of the model
     np.save(dynamics_path, np.array(generator.datasets.A))
 
     if args.state_path is None:
-        state_path = f'states_{job_id}.npy'
+        state_path = f'states_{run_id}.npy'
     else:
         state_path = args.state_path
 

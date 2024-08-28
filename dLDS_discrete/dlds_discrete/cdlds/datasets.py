@@ -139,26 +139,27 @@ class CdLDSDataGenerator:
         z_interval = np.random.randint(1, discrete_state_maxT, size=T//10)
         z = np.zeros(T, dtype=int)
 
-        # create a random sequence of discrete states z
-        current_state = np.random.randint(0, self.K)
-        z[0:z_interval[0]] = current_state  # initial state
-        for i in range(1, T//10):
-            start = np.sum(z_interval[:i])
-            end = start + z_interval[i]
-            current_state = (current_state + 1) % self.K
-            z[start:end] = current_state
+        if self.K > 1:
+            # create a random sequence of discrete states z
+            current_state = np.random.randint(0, self.K)
+            z[0:z_interval[0]] = current_state  # initial state
+            for i in range(1, T//10):
+                start = np.sum(z_interval[:i])
+                end = start + z_interval[i]
+                current_state = (current_state + 1) % self.K
+                z[start:end] = current_state
 
         self.z_ = z
-        # one hot encoding of the states, e.g. [1, 0, 0] for state 0 at time point t
-        z_one_hot = np.zeros((self.K, T))
-        z_one_hot[z, np.arange(T)] = 1
 
         # Define control input
         u_temp = sparse.rand(self.D_control, T, density=control_density,
                              format="csr")
 
         # add the z one hot encoding to the control input
-        if self.fix_point_change:
+        if self.fix_point_change and self.K > 1:
+            # one hot encoding of the states, e.g. [1, 0, 0] for state 0 at time point t
+            z_one_hot = np.zeros((self.K, T))
+            z_one_hot[z, np.arange(T)] = 1
             self.U_ = sparse.vstack((u_temp, z_one_hot)).toarray()
         else:
             self.U_ = u_temp.toarray()

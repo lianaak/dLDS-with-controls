@@ -93,8 +93,10 @@ def train_model(parameters):
     fix_point_change = False
     eigenvalue_radius = 0.999
 
+    num_true_subdyn = parameters['num_subdyn']
+
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=parameters['num_subdyn'], D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=eigenvalue_radius))
+        K=num_true_subdyn, D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=eigenvalue_radius))
 
     time_points = 1000
 
@@ -103,17 +105,35 @@ def train_model(parameters):
 
     # z-score normalization
     # X = (X - X.mean(axis=0)) / X.std(axis=0)
-    np.save(args.data_path, X)
+
+    job_id = os.environ['SUBMITIT_JOB_ID']
+
+    # save the data for each job
+    if args.data_path is None:
+        data_path = f'data_{job_id}.npy'
+    else:
+        data_path = args.data_path
+    np.save(data_path, X)
+
+    if args.dynamics_path is None:
+        dynamics_path = f'As_{job_id}.npy'
+    else:
+        dynamics_path = args.dynamics_path
     # save the As of the model
-    np.save(args.dynamics_path, np.array(generator.datasets.A))
+    np.save(dynamics_path, np.array(generator.datasets.A))
 
-    np.save(args.state_path, generator.datasets.z_)
+    if args.state_path is None:
+        state_path = f'states_{job_id}.npy'
+    else:
+        state_path = args.state_path
 
-    command = 'python train.py --data_path ' + args.data_path + ' --reg ' + \
+    np.save(state_path, generator.datasets.z_)
+
+    command = 'python train.py --data_path ' + data_path + ' --reg ' + \
         str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
-        args.dynamics_path + ' --state_path ' + args.state_path + \
+        dynamics_path + ' --state_path ' + state_path + \
         ' --fix_point_change ' + \
         str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius)
     os.system(command)
@@ -142,11 +162,11 @@ def submitit_job(parameters):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/data.npy')
+    parser.add_argument('--data_path', type=str, default=None)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--dynamics_path', type=str, default='As.npy')
-    parser.add_argument('--state_path', type=str, default='states.npy')
+    parser.add_argument('--dynamics_path', type=str, default=None)
+    parser.add_argument('--state_path', type=str, default=None)
     args = parser.parse_args()
     print(args)
     main(args)

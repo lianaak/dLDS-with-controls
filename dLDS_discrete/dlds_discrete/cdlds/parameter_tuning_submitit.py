@@ -18,12 +18,6 @@ os.environ.pop("SUBMITIT_PREEMPT_SIGNAL", None)
 
 
 def main(args):
-    # load data from file
-    X = np.load(args.data_path)
-
-    input_size = X.shape[0]
-    X1 = torch.tensor(X[:, :-1], dtype=torch.float32)
-    t = X1.shape[1]
 
     ax_client = AxClient()
     ax_client.create_experiment(

@@ -40,7 +40,7 @@ def multi_step(X, model):
     return X_hat
 
 
-def plotting(X, plot_states=False, states=None, title=None):
+def plotting(X, plot_states=False, states=None, title=None, show=True):
 
     fig = go.Figure()
 
@@ -61,4 +61,6 @@ def plotting(X, plot_states=False, states=None, title=None):
             name='state'
         ))
     fig.update_layout(title=title)
-    fig.show()
+    if show:
+        fig.show()
+    return fig

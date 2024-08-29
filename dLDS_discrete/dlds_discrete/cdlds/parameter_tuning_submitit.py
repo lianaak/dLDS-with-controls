@@ -27,8 +27,8 @@ def main(args):
                 0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
-            {"name": "num_subdyn", "type": "range",
-                "bounds": [1, 3], "value_type": "int"},
+            {"name": "num_subdyn", "type": "fixed",
+                "value": 1, "value_type": "int"},
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [

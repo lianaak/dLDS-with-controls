@@ -76,6 +76,7 @@ def main(args):
         model.parameters(), lr=args.lr)  # Adam optimizer
 
     losses = []
+
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
     if args.eigenvalue_radius < 0.999:
@@ -85,7 +86,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_NoBias_C-Init_Rand",
+        project=f"{project_name}_{str(args.num_subdyn)}_State_NoBias_C-Init_OneswithNoise",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}",
@@ -109,29 +110,39 @@ def main(args):
                 tepoch.set_description(f'Epoch {epoch}')
 
                 for i in range(len(batch)):
-                    # if we call the model with the input, it will call the forward function
-                    # print('batch')
-                    # print(f'batch {batch[i]}')
                     y_pred[i] = model(batch[i], idx[i])  # forward pass
 
+                # Sparsity loss: L1 regularization term
                 regularization_term = model.coeffs.abs().sum()
+                sparsity_loss = args.reg * regularization_term
 
-                # Difference between t and t-1 of the coefficients
+                # Smooth Loss: Difference between t and t-1 of the coefficients
                 coeff_delta = model.coeffs[:,
                                            1:] - model.coeffs[:, :-1]
                 # L1 norm of the difference
                 smooth_reg = coeff_delta.abs().sum()
+                smooth_reg_loss = args.smooth * smooth_reg * input_size
 
-                # print(f'prediction {y_pred}')
-                # print(target)
+                # Reconstruction Loss
+                reconstruction_loss = dlds_loss(y_pred, target)
 
-                eigenvalue_reg = torch.stack(
+                # Eigenvalue regularization loss
+                eigenvalue_reg_loss = 0.001 * torch.stack(
                     [f_i.reg_error() for f_i in model.F], axis=0).sum()
 
-                loss = dlds_loss(
-                    y_pred, target) + args.reg * regularization_term + args.smooth * smooth_reg * input_size
+                loss = reconstruction_loss + sparsity_loss + \
+                    smooth_reg_loss + eigenvalue_reg_loss
 
-                loss += eigenvalue_reg
+                # log loss before backpropagation
+                if epoch == 0:
+                    wandb.log({'loss': loss.item()})
+                    wandb.log({'sparsity_loss': sparsity_loss.item()})
+                    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+                    wandb.log(
+                        {'reconstruction_loss': reconstruction_loss.item()})
+                    wandb.log(
+                        {'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
+
                 # reset the gradients to zero before backpropagation to avoid accumulation
                 optimizer.zero_grad()
                 # backpropagation of the loss to compute the gradients
@@ -141,9 +152,17 @@ def main(args):
                 tepoch.set_postfix(
                     loss=loss.item())
 
+                # log the losses
             losses.append(loss.item())
 
             wandb.log({'loss': loss.item()})
+            wandb.log({'sparsity_loss': sparsity_loss.item()})
+            wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+            wandb.log({'reconstruction_loss': reconstruction_loss.item()})
+            wandb.log({'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
+
+            # log learning rate
+
     # save the model
     torch.save(model.state_dict(), os.path.join(
         args.model_path, 'model.pth'))
@@ -183,15 +202,15 @@ def main(args):
     X2_hat_residuals = torch.stack(X2_hat).squeeze() - y
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
-    fig = px.line(
-        X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
+    fig = util.plotting(
+        X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     wandb.log({'single-step residuals': fig})
 
-    fig = px.line(
-        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}')
+    fig = util.plotting(
+        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
@@ -200,8 +219,8 @@ def main(args):
     # coefficients
     coefficients = np.array([c.detach().numpy()
                             for c in model.coeffs])
-    fig = px.line(
-        coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}')
+    fig = util.plotting(
+        coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 

@@ -66,8 +66,10 @@ def main(args):
             # decompose A with SVD
             f.linear.weight = torch.nn.Parameter(
                 torch.tensor(A[idx], dtype=torch.float32))
-        model.coeffs = torch.nn.Parameter(
-            torch.tensor(one_hot_states, dtype=torch.float32))
+        # model.coeffs = torch.nn.Parameter(
+        #    torch.tensor(one_hot_states, dtype=torch.float32))
+        model.coeffs = torch.nn.Parameter(torch.tensor(
+            np.random.rand(num_subdyn, X.shape[0]), requires_grad=True))
 
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)
@@ -92,7 +94,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_NoBias_C-Init_Ones",
+        project=f"{project_name}_{str(args.num_subdyn)}_State_NoBias_C-Init_Rand",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}",

@@ -33,7 +33,7 @@ class DeepDLDS(torch.nn.Module):
 
         # initialize coefficients with just ones with a little noise
         self.coeffs = torch.nn.Parameter(torch.ones(
-            num_subdyn, time_points) + 0.05*torch.randn(num_subdyn, time_points), requires_grad=True)
+            num_subdyn, time_points), requires_grad=True)  # adding noise: + 0.05*torch.randn(num_subdyn, time_points)
 
         self.Bias = torch.nn.Parameter(torch.tensor(
             np.random.rand(num_subdyn, time_points), requires_grad=True))

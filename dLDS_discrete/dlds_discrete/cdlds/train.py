@@ -94,7 +94,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_NoBias_C-Init_Rand",
+        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}",
@@ -183,9 +183,8 @@ def main(args):
     # eigenvalues = torch.linalg.eig(
     #    torch.tensor(f_sum, dtype=torch.float32))[0]
 
-    # print(eigenvalues)
-
-    # print(model.coeffs)
+    # create correlation matrix plot of coefficients and states
+    # heat = go.Heatmap()
 
     # predict the next time step
     X2_hat = util.single_step(X, model)

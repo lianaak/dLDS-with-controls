@@ -45,7 +45,7 @@ class DeepDLDS(torch.nn.Module):
             # torch init
 
             f_i = slim.linear.BoundedNormLinear(
-                input_size, input_size, bias=False, sigma_max=1.0, sigma_min=0)
+                input_size, input_size, bias=True, sigma_max=1.0, sigma_min=0)
 
             # initialize F
             # f_i.(torch.nn.init.xavier_normal)

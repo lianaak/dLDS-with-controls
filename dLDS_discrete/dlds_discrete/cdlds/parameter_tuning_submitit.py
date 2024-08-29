@@ -61,7 +61,7 @@ def main(args):
         for trial_index, parameters in trial_index_to_param.items():
 
             # Submit the job and wait for result
-            job = submitit_job(parameters)
+            job = submitit_job(parameters, args.fix_point_change)
             submitted_jobs += 1
             jobs.append((job, trial_index))
             time.sleep(1)
@@ -82,9 +82,9 @@ def main(args):
         f.write(f"Best values: {values}")
 
 
-def train_model(parameters):
+def train_model(parameters, fix_point_change=False):
 
-    fix_point_change = False
+    fix_point_change = fix_point_change
     eigenvalue_radius = 0.999
 
     num_true_subdyn = parameters['num_subdyn']
@@ -137,7 +137,7 @@ def train_model(parameters):
     return loss
 
 
-def submitit_job(parameters):
+def submitit_job(parameters, fix_point_change=False):
     # Directory for Submitit logs
     executor = AutoExecutor(folder="submitit_jobs")
     executor.update_parameters(
@@ -148,7 +148,7 @@ def submitit_job(parameters):
         gpus_per_node=1,  # Number of GPUs if required
     )
 
-    job = executor.submit(train_model, parameters)
+    job = executor.submit(train_model, parameters, fix_point_change)
     return job
 
 # Assuming ax_client is already initialized as shown in step 2
@@ -161,6 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--dynamics_path', type=str, default=None)
     parser.add_argument('--state_path', type=str, default=None)
+    parser.add_argument('--fix_point_change', type=str, default=False)
     args = parser.parse_args()
     print(args)
     main(args)

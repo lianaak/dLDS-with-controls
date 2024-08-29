@@ -55,6 +55,10 @@ def main(args):
     A = np.load(args.dynamics_path)
     states = np.load(args.state_path)
 
+    # one-hot encoding of the states
+    one_hot_states = np.zeros((num_subdyn, len(states)))
+    one_hot_states[states, np.arange(len(states))] = 1
+
     # initialize F with A
     with torch.no_grad():
         for idx, f in enumerate(model.F):
@@ -62,6 +66,8 @@ def main(args):
             # decompose A with SVD
             f.linear.weight = torch.nn.Parameter(
                 torch.tensor(A[idx], dtype=torch.float32))
+        model.coeffs = torch.nn.Parameter(
+            torch.tensor(one_hot_states, dtype=torch.float32))
 
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)

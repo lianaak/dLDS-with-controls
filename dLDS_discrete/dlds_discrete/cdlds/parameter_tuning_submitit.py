@@ -63,7 +63,7 @@ def main(args):
         for trial_index, parameters in trial_index_to_param.items():
 
             # Submit the job and wait for result
-            job = submitit_job(parameters, args.fix_point_change)
+            job = submitit_job(parameters, args)
             submitted_jobs += 1
             jobs.append((job, trial_index))
             time.sleep(1)
@@ -84,10 +84,10 @@ def main(args):
         f.write(f"Best values: {values}")
 
 
-def train_model(parameters, fix_point_change=False):
+def train_model(parameters, args):
 
-    fix_point_change = fix_point_change
-    eigenvalue_radius = 0.999
+    fix_point_change = args.fix_point_change
+    eigenvalue_radius = args.eigenvalue_radius
 
     num_true_subdyn = parameters['num_subdyn']
 
@@ -165,6 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--dynamics_path', type=str, default=None)
     parser.add_argument('--state_path', type=str, default=None)
     parser.add_argument('--fix_point_change', type=str, default=False)
+    parser.add_argument('--eigenvalue_radius', type=str, default=0.99)
     args = parser.parse_args()
     print(args)
     main(args)

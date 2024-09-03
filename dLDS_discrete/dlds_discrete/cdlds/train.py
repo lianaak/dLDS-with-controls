@@ -151,7 +151,7 @@ def main(args):
 
     wandb.log({'loss': loss.item()})
     # wandb.log({'sparsity_loss': sparsity_loss.item()})
-    wandb.log({'smooth_loss': smooth_reg_loss.item()})
+    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
     wandb.log({'reconstruction_loss': reconstruction_loss.item()})
 
     # training the model

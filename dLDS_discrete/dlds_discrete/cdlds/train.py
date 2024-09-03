@@ -60,7 +60,7 @@ def main(args):
 
     A = np.load(args.dynamics_path)
     states = np.load(args.state_path)
-    bias = np.load(args.bias_path)
+    # bias = np.load(args.bias_path)
 
     # one-hot encoding of the states
     one_hot_states = np.zeros((num_subdyn, len(states)))
@@ -313,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')
-    parser.add_argument('--bias_path', type=str, default='Bias.npy')
+    # parser.add_argument('--bias_path', type=str, default='Bias.npy')
     parser.add_argument('--fix_point_change', type=bool, default=False),
     parser.add_argument('--eigenvalue_radius', type=float, default=0.995)
     args = parser.parse_args()

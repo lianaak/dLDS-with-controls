@@ -23,8 +23,8 @@ def main(args):
     ax_client.create_experiment(
         name="dLDS_hyperparameter_tuning",
         parameters=[
-            {"name": "reg", "type": "range", "bounds": [
-                0.00001, 10.00001], "log_scale": True},
+            # {"name": "reg", "type": "range", "bounds": [
+            #    0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "num_subdyn", 'type': 'choice',
@@ -32,7 +32,7 @@ def main(args):
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
-                20, 80], "value_type": "int"},
+                50, 100], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',
                 'values': [16, 32, 64, 128]}
         ],
@@ -125,8 +125,10 @@ def train_model(parameters, args):
 
     np.save(state_path, generator.datasets.z_)
 
-    command = 'python train.py --data_path ' + data_path + ' --reg ' + \
-        str(parameters['reg']) + ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
+    # ' --reg ' + str(parameters['reg']) + \
+
+    command = 'python train.py --data_path ' + data_path + \
+        ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
         str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
         dynamics_path + ' --state_path ' + state_path + \

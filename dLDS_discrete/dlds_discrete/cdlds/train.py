@@ -121,11 +121,13 @@ def main(args):
         project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_OG_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
-        name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_higher_lr",
+        # reg{str(round(args.reg, 3))}_
+        name=f"smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_batch_size_{str(args.batch_size)}",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
             "epochs": args.epochs,
+            "batch_size": args.batch_size,
         },
     )
 
@@ -149,7 +151,7 @@ def main(args):
 
     wandb.log({'loss': loss.item()})
     # wandb.log({'sparsity_loss': sparsity_loss.item()})
-    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+    wandb.log({'smooth_loss': smooth_reg_loss.item()})
     wandb.log({'reconstruction_loss': reconstruction_loss.item()})
 
     # training the model
@@ -222,7 +224,7 @@ def main(args):
     torch.save(model.state_dict(), os.path.join(
         args.model_path, 'model.pth'))
 
-    print(f'Finished training with reg={args.reg}, smooth={args.smooth}')
+    print(f'Finished training with smooth={args.smooth}')
 
     # add a penalty for when the eigenvalues are not in the unit circle
     # f_sum = np.sum([model.coeffs[fidx, idx[i]].detach().numpy(
@@ -257,24 +259,24 @@ def main(args):
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = util.plotting(
-        np.hstack([y, torch.stack(X2_hat).squeeze()]), title=f'Ground Truth and single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+        np.hstack([y, torch.stack(X2_hat).squeeze()]), title=f'Ground Truth and single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
     wandb.log({'single-step + ground truth': fig})
 
     fig = util.plotting(
-        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
     wandb.log({'multi-step': fig})
 
     fig = util.plotting(
-        X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+        X2_hat_residuals, title=f'Residuals of single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
-        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
+        f'{saving_path}/smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     wandb.log({'single-step residuals': fig})
 
     fig = util.plotting(
-        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
-        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
+        f'{saving_path}/smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
     wandb.log({'multi-step residuals': fig})
 
@@ -282,9 +284,9 @@ def main(args):
     coefficients = np.array([c.detach().numpy()
                             for c in model.coeffs])
     fig = util.plotting(
-        coefficients.T, title=f'Coefficients with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+        coefficients.T, title=f'Coefficients with smooth={args.smooth}', plot_states=True, states=states, show=False)
     fig.write_image(
-        f'{saving_path}/reg_{reg_string}_smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
+        f'{saving_path}/smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
     # log the plots to wandb
     wandb.log({'coefficients': fig})

@@ -21,7 +21,7 @@ from sklearn.linear_model import RANSACRegressor
 
 class DeepDLDS(torch.nn.Module):
 
-    def __init__(self, input_size, output_size, num_subdyn, time_points, softmax_temperature=1):
+    def __init__(self, input_size, output_size, num_subdyn, time_points, fixed_point_change=False, softmax_temperature=1):
         super().__init__()
 
         self.softmax_temperature = softmax_temperature
@@ -35,17 +35,17 @@ class DeepDLDS(torch.nn.Module):
         self.coeffs = torch.nn.Parameter(torch.ones(
             num_subdyn, time_points), requires_grad=True)  # adding noise: + 0.05*torch.randn(num_subdyn, time_points)
 
-        self.Bias = torch.nn.Parameter(torch.tensor(
-            np.random.rand(num_subdyn, time_points), requires_grad=True))
+        # self.Bias = torch.nn.Parameter(torch.tensor(
+        #    np.random.rand(num_subdyn, time_points), requires_grad=True))
 
-        self.Bias.data = torch.nn.functional.sigmoid(self.Bias.data)
+        # self.Bias.data = torch.nn.functional.sigmoid(self.Bias.data)
 
         for i in range(num_subdyn):
 
             # torch init
 
-            f_i = slim.linear.BoundedNormLinear(
-                input_size, input_size, bias=False, sigma_max=1.0, sigma_min=0)
+            f_i = slim.linear.SpectralLinear(
+                input_size, input_size, bias=fixed_point_change, sigma_max=1.0, sigma_min=0)
 
             # initialize F
             # f_i.(torch.nn.init.xavier_normal)
@@ -53,11 +53,8 @@ class DeepDLDS(torch.nn.Module):
             self.F.append(f_i)
 
     def forward(self, x_t, t):
-        # print(f'coefficients:{self.coeffs[0, t]}')
-        # print(f'F output:{self.F[0].weight}')
-        # print(f'x input:{x_t}')
-        # print(f'F output:{self.F[0](x_t)}')
-        y_t = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0)) + self.Bias[i, t]
+
+        y_t = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))  # + self.Bias[i, t]
                            for i, f_i in enumerate(self.F)]).sum(dim=0)
         return y_t
 

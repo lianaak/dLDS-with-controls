@@ -26,6 +26,12 @@ class TimeSeriesDataset(Dataset):
         return self.data[idx], idx
 
 
+def reg_error(layer, p=2):
+    return torch.max(torch.norm(layer.effective_W(), p) - 1.0, torch.zeros(1)) + \
+        torch.max(0.0 -
+                  torch.norm(layer.effective_W(), p), torch.zeros(1))
+
+
 def main(args):
 
     # Create model directory
@@ -54,6 +60,7 @@ def main(args):
 
     A = np.load(args.dynamics_path)
     states = np.load(args.state_path)
+    bias = np.load(args.bias_path)
 
     # one-hot encoding of the states
     one_hot_states = np.zeros((num_subdyn, len(states)))
@@ -61,15 +68,32 @@ def main(args):
 
     # initialize F with A
     with torch.no_grad():
-        for idx, f in enumerate(model.F):
 
-            # decompose A with SVD
-            f.linear.weight = torch.nn.Parameter(
-                torch.tensor(A[idx], dtype=torch.float32))
-        # model.coeffs = torch.nn.Parameter(
-        #    torch.tensor(one_hot_states, dtype=torch.float32))
-        model.coeffs = torch.nn.Parameter(torch.tensor(
-            np.random.rand(num_subdyn, X.shape[0]), requires_grad=True))
+        """         
+        for idx, f in enumerate(model.F):
+            if args.fix_point_change:
+                print(f.bias.shape)
+                pass
+                # f.linear.bias = torch.nn.Parameter(
+                #    torch.tensor(bias[idx], dtype=torch.float32)) """
+
+        """
+        # decompose A with SVD
+        f.linear.weight = torch.nn.Parameter(
+            torch.tensor(A[idx], dtype=torch.float32))
+
+        # adding a bit of noise
+        f.linear.weight += 1 * torch.randn_like(f.linear.weight) """
+
+        # if args.fix_point_change:
+        #    model.linear.bias = torch.nn.Parameter(
+        #        torch.tensor(one_hot_states, dtype=torch.float32))
+
+        model.coeffs = torch.nn.Parameter(
+            torch.tensor(one_hot_states, dtype=torch.float32))
+
+        # model.coeffs = torch.nn.Parameter(torch.tensor(
+        #    np.random.rand(num_subdyn, X.shape[0]), requires_grad=True))
 
     # ransac = RANSACRegressor()
     # ransac.fit(X, y)
@@ -94,16 +118,39 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand",
+        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_OG_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
-        name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}",
+        name=f"reg{str(round(args.reg, 3))}_smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_higher_lr",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
             "epochs": args.epochs,
         },
     )
+
+    # Smooth Loss: Difference between t and t-1 of the coefficients
+    coeff_delta = model.coeffs[:,
+                               1:] - model.coeffs[:, :-1]
+    # L1 norm of the difference
+    smooth_reg = coeff_delta.abs().sum()
+    smooth_reg_loss = args.smooth * smooth_reg * input_size
+
+    y_pred = torch.zeros(len(X), input_size)
+
+    for i in range(len(X)):
+        y_pred[i] = model(X[i], i)  # forward pass
+
+    # Reconstruction Loss
+    reconstruction_loss = dlds_loss(y_pred, y)
+
+    loss = reconstruction_loss + \
+        smooth_reg_loss
+
+    wandb.log({'loss': loss.item()})
+    # wandb.log({'sparsity_loss': sparsity_loss.item()})
+    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+    wandb.log({'reconstruction_loss': reconstruction_loss.item()})
 
     # training the model
     for epoch in range(args.epochs):
@@ -135,21 +182,21 @@ def main(args):
                 reconstruction_loss = dlds_loss(y_pred, target)
 
                 # Eigenvalue regularization loss
-                eigenvalue_reg_loss = 0.001 * torch.stack(
-                    [f_i.reg_error() for f_i in model.F], axis=0).sum()
+                eigenvalue_reg_loss = 0.01 * torch.stack(
+                    [reg_error(f_i) for f_i in model.F], axis=0).sum()
 
-                loss = reconstruction_loss + sparsity_loss + \
-                    smooth_reg_loss + eigenvalue_reg_loss
+                loss = reconstruction_loss + \
+                    smooth_reg_loss  # + eigenvalue_reg_loss
 
                 # log loss before backpropagation
-                if epoch == 0:
-                    wandb.log({'loss': loss.item()})
-                    wandb.log({'sparsity_loss': sparsity_loss.item()})
-                    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
-                    wandb.log(
-                        {'reconstruction_loss': reconstruction_loss.item()})
-                    wandb.log(
-                        {'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
+                # if epoch == 0:
+                #    wandb.log({'loss': loss.item()})
+                # wandb.log({'sparsity_loss': sparsity_loss.item()})
+                #    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+                #    wandb.log(
+                #        {'reconstruction_loss': reconstruction_loss.item()})
+                # wandb.log(
+                #    {'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
 
                 # reset the gradients to zero before backpropagation to avoid accumulation
                 optimizer.zero_grad()
@@ -164,10 +211,10 @@ def main(args):
             losses.append(loss.item())
 
             wandb.log({'loss': loss.item()})
-            wandb.log({'sparsity_loss': sparsity_loss.item()})
+            # wandb.log({'sparsity_loss': sparsity_loss.item()})
             wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
             wandb.log({'reconstruction_loss': reconstruction_loss.item()})
-            wandb.log({'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
+            # wandb.log({'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
 
             # log learning rate
 
@@ -208,6 +255,14 @@ def main(args):
 
     X2_hat_residuals = torch.stack(X2_hat).squeeze() - y
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
+
+    fig = util.plotting(
+        np.hstack([y, torch.stack(X2_hat).squeeze()]), title=f'Ground Truth and single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+    wandb.log({'single-step + ground truth': fig})
+
+    fig = util.plotting(
+        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
+    wandb.log({'multi-step': fig})
 
     fig = util.plotting(
         X2_hat_residuals, title=f'Residuals of single-step reconstruction with reg_term={args.reg}, smooth={args.smooth}', plot_states=True, states=states, show=False)
@@ -258,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')
+    parser.add_argument('--bias_path', type=str, default='Bias.npy')
     parser.add_argument('--fix_point_change', type=bool, default=False),
     parser.add_argument('--eigenvalue_radius', type=float, default=0.995)
     args = parser.parse_args()

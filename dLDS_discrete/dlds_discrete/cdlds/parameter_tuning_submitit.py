@@ -32,7 +32,9 @@ def main(args):
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
-                1, 50], "value_type": "int"}
+                20, 80], "value_type": "int"},
+            {'name': 'batch_size', 'type': 'choice',
+                'values': [16, 32, 64, 128]}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
@@ -129,7 +131,8 @@ def train_model(parameters, fix_point_change=False):
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
         dynamics_path + ' --state_path ' + state_path + \
         ' --fix_point_change ' + \
-        str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius)
+        str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius) + \
+        ' --batch_size ' + str(parameters['batch_size'])
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')

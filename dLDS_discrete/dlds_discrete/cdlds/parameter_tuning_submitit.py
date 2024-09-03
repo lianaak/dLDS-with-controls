@@ -27,8 +27,8 @@ def main(args):
                 0.00001, 10.00001], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
-            {"name": "num_subdyn", "type": "fixed",
-                "value": 2, "value_type": "int"},
+            {"name": "num_subdyn", 'type': 'choice',
+                'values': [2, 3, 4]},
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
@@ -92,7 +92,7 @@ def train_model(parameters, args):
     num_true_subdyn = parameters['num_subdyn']
 
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=num_true_subdyn, D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=eigenvalue_radius))
+        K=num_true_subdyn, D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius)))
 
     time_points = 1000
 

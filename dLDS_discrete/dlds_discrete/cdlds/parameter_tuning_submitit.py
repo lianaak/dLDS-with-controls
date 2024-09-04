@@ -34,7 +34,9 @@ def main(args):
             {"name": "epochs", "type": "range", "bounds": [
                 50, 100], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',
-                'values': [16, 32, 64, 128]}
+                'values': [16, 32, 64, 128]},
+            {'name': 'sigma', 'type': 'range', 'bounds': [
+                0.0001, 1.0], 'log_scale': True}
         ],
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
@@ -134,7 +136,8 @@ def train_model(parameters, args):
         dynamics_path + ' --state_path ' + state_path + \
         ' --fix_point_change ' + \
         str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius) + \
-        ' --batch_size ' + str(parameters['batch_size'])
+        ' --batch_size ' + \
+        str(parameters['batch_size']) + ' --sigma ' + str(parameters['sigma'])
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')

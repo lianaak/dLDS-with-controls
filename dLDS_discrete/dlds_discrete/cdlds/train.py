@@ -92,6 +92,10 @@ def main(args):
         model.coeffs = torch.nn.Parameter(
             torch.tensor(one_hot_states, dtype=torch.float32))
 
+        sigma = args.sigma
+        # adding a bit of noise
+        model.coeffs += sigma * torch.randn_like(model.coeffs)
+
         # model.coeffs = torch.nn.Parameter(torch.tensor(
         #    np.random.rand(num_subdyn, X.shape[0]), requires_grad=True))
 
@@ -118,11 +122,11 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_OG_A-Init_Rand_SpectralLinear",
+        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
-        name=f"smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_batch_size_{str(args.batch_size)}",
+        name=f"smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_batch_size_{str(args.batch_size)}_random_coeffs",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
@@ -259,7 +263,7 @@ def main(args):
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = util.plotting(
-        np.hstack([y, torch.stack(X2_hat).squeeze()]), title=f'Ground Truth and single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
+        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False, stack_plots=True)
     wandb.log({'single-step + ground truth': fig})
 
     fig = util.plotting(
@@ -317,7 +321,8 @@ if __name__ == '__main__':
     parser.add_argument('--state_path', type=str, default='states.npy')
     # parser.add_argument('--bias_path', type=str, default='Bias.npy')
     parser.add_argument('--fix_point_change', type=bool, default=False),
-    parser.add_argument('--eigenvalue_radius', type=float, default=0.995)
+    parser.add_argument('--eigenvalue_radius', type=float, default=0.995),
+    parser.add_argument('--sigma', type=float, default=0.01)
     args = parser.parse_args()
     print(args)
     main(args)

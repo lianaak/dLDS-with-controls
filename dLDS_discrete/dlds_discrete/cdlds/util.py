@@ -1,3 +1,5 @@
+from os import name
+import select
 import numpy as np
 from sklearn.decomposition import NMF
 import plotly.express as px
@@ -40,16 +42,32 @@ def multi_step(X, model):
     return X_hat
 
 
-def plotting(X, plot_states=False, states=None, title=None, show=True):
+def plotting(X, plot_states=False, states=None, title=None, show=True, stack_plots=False):
 
     fig = go.Figure()
 
-    lines = px.line(X)
+    # if we want to stack multiple data, make sure that additional data is plotted in the same color but with different line style
+    if stack_plots:
+        for i, data in enumerate(X):
+            if i == 0:
+                name = 'true'
+            else:
+                name = f'predicted'
+            lines = px.line(data)
+            for line in lines.data:
+                line.name = f'{line.name}_{name}'
+                fig.add_trace(line)
+                fig.update_traces(
+                    line=dict(dash=('dash' if i > 0 else 'solid')), selector=dict(name=line.name))
 
-    for line in lines.data:
-        fig.add_trace(line)
+    else:
+        lines = px.line(X)
+        for line in lines.data:
+            fig.add_trace(line)
 
     if plot_states:
+        if stack_plots:
+            X = np.hstack(X)
         scaled_states = np.array(
             list(map(lambda x: (x * (X.max() - X.min()) + X.min()), states)))
 

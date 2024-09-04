@@ -263,22 +263,22 @@ def main(args):
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = util.plotting(
-        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False, stack_plots=True)
+        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False, stack_plots=True)
     wandb.log({'single-step + ground truth': fig})
 
     fig = util.plotting(
-        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
+        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
     wandb.log({'multi-step': fig})
 
     fig = util.plotting(
-        X2_hat_residuals, title=f'Residuals of single-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
+        X2_hat_residuals, title=f'Residuals of single-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     wandb.log({'single-step residuals': fig})
 
     fig = util.plotting(
-        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with smooth={args.smooth}', plot_states=True, states=states, show=False)
+        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
@@ -288,7 +288,7 @@ def main(args):
     coefficients = np.array([c.detach().numpy()
                             for c in model.coeffs])
     fig = util.plotting(
-        coefficients.T, title=f'Coefficients with smooth={args.smooth}', plot_states=True, states=states, show=False)
+        coefficients.T, title=f'Coefficients with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 

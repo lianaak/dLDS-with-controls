@@ -130,7 +130,7 @@ def train_model(parameters, args):
     # ' --reg ' + str(parameters['reg']) + \
 
     command = 'python train.py --data_path ' + data_path + \
-        ' --smooth ' + str(parameters['smooth']) + ' --epochs ' + \
+        ' --smooth ' + str(parameters['smooth']) + ' --reg ' + str(parameters['reg']) + ' --epochs ' + \
         str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
         dynamics_path + ' --state_path ' + state_path + \

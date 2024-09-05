@@ -47,6 +47,10 @@ class DeepDLDS(torch.nn.Module):
             f_i = slim.linear.SpectralLinear(
                 input_size, input_size, bias=fixed_point_change, sigma_max=1.0, sigma_min=0)
 
+            # initialize f with identity matrix
+            # f_i = torch.nn.Parameter(
+            #    torch.eye(input_size), requires_grad=False)
+
             # initialize F
             # f_i.(torch.nn.init.xavier_normal)
 
@@ -56,6 +60,9 @@ class DeepDLDS(torch.nn.Module):
 
         y_t = torch.stack([self.coeffs[i, t]*f_i(x_t.unsqueeze(0))  # + self.Bias[i, t]
                            for i, f_i in enumerate(self.F)]).sum(dim=0)
+        # y_t = torch.stack([self.coeffs[i, t]*f_i*x_t
+        #                   for i, f_i in enumerate(self.F)]).sum(dim=0)
+
         return y_t
 
     @property

@@ -89,12 +89,12 @@ def main(args):
         #    model.linear.bias = torch.nn.Parameter(
         #        torch.tensor(one_hot_states, dtype=torch.float32))
 
-        model.coeffs = torch.nn.Parameter(
-            torch.tensor(one_hot_states, dtype=torch.float32))
+        # model.coeffs = torch.nn.Parameter(
+        #     torch.tensor(one_hot_states, dtype=torch.float32))
 
-        sigma = args.sigma
+        # sigma = args.sigma
         # adding a bit of noise
-        model.coeffs += sigma * torch.randn_like(model.coeffs)
+        # model.coeffs += sigma * torch.randn_like(model.coeffs)
 
         # model.coeffs = torch.nn.Parameter(torch.tensor(
         #    np.random.rand(num_subdyn, X.shape[0]), requires_grad=True))
@@ -191,8 +191,22 @@ def main(args):
                 eigenvalue_reg_loss = 0.01 * torch.stack(
                     [reg_error(f_i) for f_i in model.F], axis=0).sum()
 
+                # entropy based sparsity loss for coefficients
+                # sparsity_loss_2 = 0.01*torch.nn.functional.gumbel_softmax(
+                #    model.coeffs, tau=0.1, hard=True).sum()
+
+                # sparsity_loss_2 = -torch.sum(model.coeffs * torch.log(c + epsilon), dim=1)  # Sum over the systems
+                # entropy_loss = torch.mean(sparsity_loss_2)
+                sparsity = - \
+                    torch.sum(model.coeffs *
+                              torch.log(model.coeffs + 1e-10), dim=0).mean()
+
+                sparsity_loss = args.reg * sparsity
+
+                # print(f"Sparsity Loss: {sparsity_loss_2}")
+
                 loss = reconstruction_loss + \
-                    smooth_reg_loss  # + eigenvalue_reg_loss
+                    smooth_reg_loss + sparsity_loss
 
                 # log loss before backpropagation
                 # if epoch == 0:
@@ -217,7 +231,7 @@ def main(args):
             losses.append(loss.item())
 
             wandb.log({'loss': loss.item()})
-            # wandb.log({'sparsity_loss': sparsity_loss.item()})
+            wandb.log({'sparsity_loss': sparsity_loss.item()})
             wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
             wandb.log({'reconstruction_loss': reconstruction_loss.item()})
             # wandb.log({'eigenvalue_reg_loss': eigenvalue_reg_loss.item()})
@@ -228,7 +242,7 @@ def main(args):
     torch.save(model.state_dict(), os.path.join(
         args.model_path, 'model.pth'))
 
-    print(f'Finished training with smooth={args.smooth}')
+    print(f'Finished training with smooth={args.smooth} and reg={args.reg}')
 
     # add a penalty for when the eigenvalues are not in the unit circle
     # f_sum = np.sum([model.coeffs[fidx, idx[i]].detach().numpy(
@@ -263,22 +277,22 @@ def main(args):
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = util.plotting(
-        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False, stack_plots=True)
+        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False, stack_plots=True)
     wandb.log({'single-step + ground truth': fig})
 
     fig = util.plotting(
-        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
+        torch.stack(X2_hat_multi[1:]).squeeze(), title=f'Multi-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False)
     wandb.log({'multi-step': fig})
 
     fig = util.plotting(
-        X2_hat_residuals, title=f'Residuals of single-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
+        X2_hat_residuals, title=f'Residuals of single-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_RECON.png', width=900, height=450, scale=3)
 
     wandb.log({'single-step residuals': fig})
 
     fig = util.plotting(
-        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
+        X2_hat_multi_residuals, title=f'Residuals of multi-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_RECON_MULTI.png', width=900, height=450, scale=3)
 
@@ -288,7 +302,7 @@ def main(args):
     coefficients = np.array([c.detach().numpy()
                             for c in model.coeffs])
     fig = util.plotting(
-        coefficients.T, title=f'Coefficients with smooth={args.smooth} with noise level={args.sigma}', plot_states=True, states=states, show=False)
+        coefficients.T, title=f'Coefficients with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False)
     fig.write_image(
         f'{saving_path}/smooth_{smooth_string}_COEFFS.png', width=900, height=450, scale=3)
 
@@ -315,7 +329,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_subdyn', type=int, default=2)
-    parser.add_argument('--reg', type=float, default=0.0001)
+    parser.add_argument('--reg', type=float, default=0.001)
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')

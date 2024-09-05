@@ -23,8 +23,8 @@ def main(args):
     ax_client.create_experiment(
         name="dLDS_hyperparameter_tuning",
         parameters=[
-            # {"name": "reg", "type": "range", "bounds": [
-            #    0.00001, 10.00001], "log_scale": True},
+            {"name": "reg", "type": "range", "bounds": [
+                0.00001, 0.1], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 10.00001], "log_scale": True},
             {"name": "num_subdyn", 'type': 'choice',
@@ -32,9 +32,9 @@ def main(args):
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
-                50, 100], "value_type": "int"},
+                150, 250], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',
-                'values': [16, 32, 64, 128]},
+                'values': [32, 64, 128]},
             {'name': 'sigma', 'type': 'range', 'bounds': [
                 0.0001, 1.0], 'log_scale': True}
         ],

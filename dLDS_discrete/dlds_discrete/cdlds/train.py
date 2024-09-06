@@ -122,7 +122,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
+        project=f"[BASELINE]_{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
@@ -188,8 +188,8 @@ def main(args):
                 reconstruction_loss = dlds_loss(y_pred, target)
 
                 # Eigenvalue regularization loss
-                eigenvalue_reg_loss = 0.01 * torch.stack(
-                    [reg_error(f_i) for f_i in model.F], axis=0).sum()
+                # eigenvalue_reg_loss = 0.01 * torch.stack(
+                #    [reg_error(f_i) for f_i in model.F], axis=0).sum()
 
                 # entropy based sparsity loss for coefficients
                 # sparsity_loss_2 = 0.01*torch.nn.functional.gumbel_softmax(

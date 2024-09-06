@@ -26,11 +26,11 @@ def main(args):
             {"name": "reg", "type": "range", "bounds": [
                 0.00001, 0.1], "log_scale": True},
             {"name": "smooth", "type": "range", "bounds": [
-                0.00001, 10.00001], "log_scale": True},
+                0.00001, 1.00001], "log_scale": True},
             {"name": "num_subdyn", 'type': 'choice',
                 'values': [2, 3, 4]},
             {"name": "learning_rate", "type": "range", "bounds": [
-                0.00001, 0.001], "log_scale": True},
+                0.0001, 0.001], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
                 150, 250], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',

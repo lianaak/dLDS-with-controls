@@ -122,7 +122,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"[BASELINE]_{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
+        project=f"[TEST]_{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_

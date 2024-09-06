@@ -23,8 +23,7 @@ def main(args):
     ax_client.create_experiment(
         name="dLDS_hyperparameter_tuning",
         parameters=[
-            {"name": "reg", "type": "range", "bounds": [
-                0.00001, 0.1], "log_scale": True},
+            {"name": "reg", "type": "fixed", "value": 0},
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 1.00001], "log_scale": True},
             {"name": "num_subdyn", 'type': 'choice',

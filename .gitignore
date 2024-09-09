@@ -17,7 +17,7 @@ __pycache__/
 *toy_example.ipynb
 *toy_example2.ipynb
 *toy_data_noga.ipynb
-dLDS_discrete/dlds_discrete/cdlds/models2.py
+#dLDS_discrete/dlds_discrete/cdlds/models2.py
 dLDS_discrete/dlds_discrete/cdlds/combining_dlds_controls_2.ipynb
 dLDS_discrete/dlds_discrete/cdlds/models_temp_NN.py
 

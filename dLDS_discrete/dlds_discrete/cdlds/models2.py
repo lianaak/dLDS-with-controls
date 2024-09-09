@@ -50,7 +50,8 @@ class DeepDLDS(torch.nn.Module):
             f_i = torch.nn.LSTM(input_size, hidden_size, num_layers=1,
                                 bias=True, batch_first=True, bidirectional=False)
 
-            f_i_linear = torch.nn.Linear(hidden_size, output_size)
+            f_i_linear = slim.linear.SpectralLinear(
+                hidden_size, output_size, bias=fixed_point_change, sigma_max=1.0, sigma_min=0)
 
             # initialize f with identity matrix
             # f_i = torch.nn.Parameter(

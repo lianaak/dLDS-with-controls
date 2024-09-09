@@ -262,16 +262,16 @@ def main(args):
     # heat = go.Heatmap()
 
     # create arg max of coefficients at each time step, such that only the highest coefficient is 1
-    argmax = torch.argmax(model.coeffs, dim=0)
-    argmax_one_hot = torch.zeros_like(model.coeffs)
-    argmax_one_hot[argmax, torch.arange(model.coeffs.shape[1])] = 1
+    # argmax = torch.argmax(model.coeffs, dim=0)
+    # argmax_one_hot = torch.zeros_like(model.coeffs)
+    # argmax_one_hot[argmax, torch.arange(model.coeffs.shape[1])] = 1
 
-    print(f'argmax_one_hot: {argmax_one_hot.detach().numpy().shape}')
-    print(f'argmax_one_hot: {one_hot_states.shape}')
+    # print(f'argmax_one_hot: {argmax_one_hot.detach().numpy().shape}')
+    # print(f'argmax_one_hot: {one_hot_states.shape}')
 
     # compute correlation between argmax_one_hot and one_hot_states
-    correlated = np.dot(argmax_one_hot.detach().numpy(),
-                        one_hot_states.T)
+    # correlated = np.dot(argmax_one_hot.detach().numpy(),
+    #                    one_hot_states.T)
 
     # pearson = np.corrcoef(argmax_one_hot.detach().numpy(),
     #                      one_hot_states, rowvar=False)

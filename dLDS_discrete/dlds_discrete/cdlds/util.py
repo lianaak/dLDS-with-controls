@@ -21,23 +21,23 @@ def init_U(X1, X2, D_control, err=None):
     return U_0.T
 
 
-def single_step(X, model):
+def single_step(X, model, hidden_prev=None):
     # predict the next time step
     X_hat = []
     with torch.no_grad():
         for i in range(X.shape[0]):
-            y = model(X[i, :], i)
+            y = model(X[i, :].unsqueeze(0), i, hidden_prev)
             X_hat.append(y)
     return X_hat
 
 
-def multi_step(X, model):
+def multi_step(X, model, hidden_prev=None):
     # predict all time steps from initial state
     X_hat = []
     X_hat.append(X[0, :].unsqueeze(0))
     with torch.no_grad():
         for i in range(X.shape[0]):
-            y = model(X_hat[-1].squeeze(), i)
+            y = model(X_hat[-1].squeeze(), i, hidden_prev)
             X_hat.append(y)
     return X_hat
 

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 import argparse
 import os
 import numpy as np
-from models import DeepDLDS
+from models2 import DeepDLDS
 import wandb
 import submitit
 import plotly.express as px
@@ -58,7 +58,9 @@ def main(args):
     input_size = X.shape[1]
     num_subdyn = args.num_subdyn
     output_size = y.shape[1]
-    model = DeepDLDS(input_size, output_size, num_subdyn,
+
+    hidden_size = 50
+    model = DeepDLDS(input_size, hidden_size, output_size, num_subdyn,
                      X.shape[0], softmax_temperature=0.0001)
 
     A = np.load(args.dynamics_path)
@@ -147,19 +149,17 @@ def main(args):
 
     y_pred = torch.zeros(len(X), input_size)
 
-    for i in range(len(X)):
-        y_pred[i] = model(X[i], i)  # forward pass
+    # y_pred[i] = model(X[i], i)  # forward pass
 
     # Reconstruction Loss
     reconstruction_loss = dlds_loss(y_pred, y)
 
-    loss = reconstruction_loss + \
-        smooth_reg_loss
+    loss = reconstruction_loss  # + smooth_reg_loss
 
-    wandb.log({'loss': loss.item()})
+    # wandb.log({'loss': loss.item()})
     # wandb.log({'sparsity_loss': sparsity_loss.item()})
-    wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
-    wandb.log({'reconstruction_loss': reconstruction_loss.item()})
+    # wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
+    # wandb.log({'reconstruction_loss': reconstruction_loss.item()})
 
     # training the model
     for epoch in range(args.epochs):
@@ -169,12 +169,17 @@ def main(args):
 
             # iterate over the data loader which will return a batch of data and target
             for (batch, target), idx in tepoch:
-                y_pred = torch.zeros(len(batch), input_size)
+                y_pred = torch.zeros(len(batch), output_size)
 
                 tepoch.set_description(f'Epoch {epoch}')
 
-                for i in range(len(batch)):
-                    y_pred[i] = model(batch[i], idx[i])  # forward pass
+                # print(f'Batch: {batch.shape}')
+
+                hidden_prev = torch.zeros(1, 1, hidden_size)
+                y_pred, hidden_prev = model(
+                    batch, idx, hidden_prev)  # forward pass
+
+                hidden_prev = hidden_prev.detach()
 
                 # Sparsity loss: L1 regularization term
                 regularization_term = model.coeffs.abs().sum()
@@ -273,7 +278,7 @@ def main(args):
     # print(correlated)
     # fig = go.Figure(data=go.Heatmap(z=correlated))
 
-    wandb.log({'correlation_matrix': fig})
+    # wandb.log({'correlation_matrix': fig})
 
     # get confusion matrix
     # confusion_matrix = confusion_matrix(one_hot_states, argmax_one_hot)
@@ -281,8 +286,8 @@ def main(args):
     # fig = ff.create_annotated_heatmap(confusion_matrix, x=[f'State {i}' for i in range(num_subdyn)], y=[f'State {i}' for i in range(num_subdyn)])
 
     # predict the next time step
-    X2_hat = util.single_step(X, model)
-    X2_hat_multi = util.multi_step(X, model)
+    X2_hat = util.single_step(X, model, hidden_prev)
+    X2_hat_multi = util.multi_step(X, model, hidden_prev)
 
     reg_string = str(args.reg).replace('.', '_')
     smooth_string = str(args.smooth).replace('.', '_')

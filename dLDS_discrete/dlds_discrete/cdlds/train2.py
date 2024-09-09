@@ -286,8 +286,25 @@ def main(args):
     # fig = ff.create_annotated_heatmap(confusion_matrix, x=[f'State {i}' for i in range(num_subdyn)], y=[f'State {i}' for i in range(num_subdyn)])
 
     # predict the next time step
-    X2_hat = util.single_step(X, model, hidden_prev)
-    X2_hat_multi = util.multi_step(X, model, hidden_prev)
+    X2_hat = []
+    hidden_prev = torch.zeros(1, 1, hidden_size)
+    with torch.no_grad():
+        for i in range(X.shape[0]):
+            y_pred, hidden_prev = model(X[i, :].view(1, -1), i, hidden_prev)
+            X2_hat.append(y_pred)
+
+    X2_hat = torch.stack(X2_hat).squeeze()
+
+    print(f'X2_hat: {X2_hat.shape}')
+
+    X2_hat_multi = []
+    X2_hat_multi.append(X[0, :].view(1, -1))
+    hidden_prev = torch.zeros(1, 1, hidden_size)
+    with torch.no_grad():
+        for i in range(X.shape[0]):
+            y_pred, hidden_prev = model(
+                X2_hat_multi[-1].view(1, -1), i, hidden_prev)
+            X2_hat_multi.append(y_pred)
 
     reg_string = str(args.reg).replace('.', '_')
     smooth_string = str(args.smooth).replace('.', '_')
@@ -305,11 +322,13 @@ def main(args):
 
     print(f'Storing visualizations...')
 
-    X2_hat_residuals = torch.stack(X2_hat).squeeze() - y
+    print(y.shape)
+
+    X2_hat_residuals = X2_hat - y
     X2_hat_multi_residuals = torch.stack(X2_hat_multi[1:]).squeeze() - y
 
     fig = util.plotting(
-        [y, torch.stack(X2_hat).squeeze()], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False, stack_plots=True)
+        [y, X2_hat], title=f'Ground Truth and single-step reconstruction with smooth={args.smooth} and coefficient entropy={args.reg}', plot_states=True, states=states, show=False, stack_plots=True)
     wandb.log({'single-step + ground truth': fig})
 
     fig = util.plotting(

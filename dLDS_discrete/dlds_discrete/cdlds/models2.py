@@ -68,9 +68,11 @@ class DeepDLDS(torch.nn.Module):
             out, _ = f_i(x_t.unsqueeze(0))
             out = out.reshape(-1, self.hidden_size)
             out = self.F_linear[i](out)
-            # print(type(out.float()))
-            # print(self.coeffs[i, t].float())
-            y_f_i = self.coeffs[i, t].float()@out
+
+            if type(t) == int:
+                y_f_i = self.coeffs[i, t].item()*out
+            else:
+                y_f_i = self.coeffs[i, t].float()@out
             y_f.append(y_f_i)
         y_t = torch.stack(y_f).sum(dim=0)
 

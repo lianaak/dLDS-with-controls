@@ -164,7 +164,7 @@ def submitit_job(parameters, fix_point_change=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default=None)
-    parser.add_argument('train_path', type=str, default="train.py")
+    parser.add_argument('--train_path', type=str, default="train.py")
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--dynamics_path', type=str, default=None)

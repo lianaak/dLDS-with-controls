@@ -128,7 +128,7 @@ def train_model(parameters, args):
 
     # ' --reg ' + str(parameters['reg']) + \
 
-    command = 'python train.py --data_path ' + data_path + \
+    command = 'python ' + args.train_path + ' --data_path ' + data_path + \
         ' --smooth ' + str(parameters['smooth']) + ' --reg ' + str(parameters['reg']) + ' --epochs ' + \
         str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
@@ -164,6 +164,7 @@ def submitit_job(parameters, fix_point_change=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default=None)
+    parser.add_argument('train_path', type=str, default="train.py")
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--dynamics_path', type=str, default=None)

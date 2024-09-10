@@ -161,6 +161,9 @@ def main(args):
     # wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
     # wandb.log({'reconstruction_loss': reconstruction_loss.item()})
 
+    initial_teacher_forcing_ratio = 1.0
+    final_teacher_forcing_ratio = 0.0
+
     # training the model
     for epoch in range(args.epochs):
 
@@ -173,13 +176,14 @@ def main(args):
 
                 tepoch.set_description(f'Epoch {epoch}')
 
+                teacher_forcing_ratio = initial_teacher_forcing_ratio - \
+                    (initial_teacher_forcing_ratio -
+                     final_teacher_forcing_ratio) * (epoch / args.epochs)
+
                 # print(f'Batch: {batch.shape}')
 
-                hidden_prev = torch.zeros(1, 1, hidden_size)
-                y_pred, hidden_prev = model(
-                    batch, idx, hidden_prev)  # forward pass
-
-                hidden_prev = hidden_prev.detach()
+                y_pred = model(
+                    batch, idx, teacher_forcing_ratio=teacher_forcing_ratio, y_true=target)
 
                 # Sparsity loss: L1 regularization term
                 regularization_term = model.coeffs.abs().sum()
@@ -287,10 +291,9 @@ def main(args):
 
     # predict the next time step
     X2_hat = []
-    hidden_prev = torch.zeros(1, 1, hidden_size)
     with torch.no_grad():
         for i in range(X.shape[0]):
-            y_pred, hidden_prev = model(X[i, :].view(1, -1), i, hidden_prev)
+            y_pred = model(X[i, :].view(1, -1), i)
             X2_hat.append(y_pred)
 
     X2_hat = torch.stack(X2_hat).squeeze()
@@ -299,11 +302,10 @@ def main(args):
 
     X2_hat_multi = []
     X2_hat_multi.append(X[0, :].view(1, -1))
-    hidden_prev = torch.zeros(1, 1, hidden_size)
     with torch.no_grad():
         for i in range(X.shape[0]):
-            y_pred, hidden_prev = model(
-                X2_hat_multi[-1].view(1, -1), i, hidden_prev)
+            y_pred = model(
+                X2_hat_multi[-1].view(1, -1), i)
             X2_hat_multi.append(y_pred)
 
     reg_string = str(args.reg).replace('.', '_')

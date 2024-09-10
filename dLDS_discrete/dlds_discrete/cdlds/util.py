@@ -31,18 +31,22 @@ def single_step(X, model):
     return X_hat
 
 
-def multi_step(X, model):
+def multi_step(X, model, lookback=1):
     # predict all time steps from initial state
     X_hat = []
-    X_hat.append(X[0, :].unsqueeze(0))
+    X_hat.append(X[:lookback, :])
     with torch.no_grad():
         for i in range(X.shape[0]):
-            y = model(X_hat[-1].squeeze(), i)
+            # y = model(X_hat[-1].squeeze(), i)
+            # print(X_hat[-lookback:][1].shape)
+            # print(torch.tensor(X_hat[-lookback:]).shape)
+            y = model(
+                X_hat[-lookback:][0], np.arange(i+lookback))
             X_hat.append(y)
     return X_hat
 
 
-def plotting(X, plot_states=False, states=None, title=None, show=True, stack_plots=False):
+def plotting(X, plot_states=False, states=None, title=None, show=False, stack_plots=False):
 
     fig = go.Figure()
 

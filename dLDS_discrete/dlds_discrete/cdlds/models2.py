@@ -32,6 +32,8 @@ class DeepDLDS(torch.nn.Module):
         self.coeffs = torch.nn.Parameter(torch.tensor(
             np.random.rand(num_subdyn, time_points), requires_grad=True))
 
+        # self.coeffs = torch.nn.Softmax(dim=0)(self.coeffs)
+
         # initialize coefficients with just ones with a little noise
         # self.coeffs = torch.nn.Parameter(torch.ones(
         #    num_subdyn, time_points), requires_grad=True)  # adding noise: + 0.05*torch.randn(num_subdyn, time_points)
@@ -63,7 +65,7 @@ class DeepDLDS(torch.nn.Module):
             self.F.append(f_i)
             self.F_linear.append(f_i_linear)
 
-    def forward(self, x_t, t, hidden_prev):
+    def forward(self, x_t, t, teacher_forcing_ratio=1.0, y_true=None):
         y_f = []
         for i, f_i in enumerate(self.F):
             out, _ = f_i(x_t.unsqueeze(0))
@@ -75,7 +77,14 @@ class DeepDLDS(torch.nn.Module):
             else:
                 y_f_i = self.coeffs[i, t].float()@out
             y_f.append(y_f_i)
-        y_t = torch.stack(y_f).sum(dim=0)
+
+        use_teacher_forcing = True if torch.rand(
+            1).item() < teacher_forcing_ratio else False
+
+        if use_teacher_forcing:
+            y_t = y_true
+        else:
+            y_t = torch.stack(y_f).sum(dim=0)
 
         # y_t = torch.stack([self.coeffs[i, t]@self.linear(f_i(x_t.unsqueeze(0))[1])  # + self.Bias[i, t]
         #                  for i, f_i in enumerate(self.F)]).sum(dim=0)
@@ -84,7 +93,7 @@ class DeepDLDS(torch.nn.Module):
         # y_t = torch.stack([self.coeffs[i, t]*f_i@x_t
         #                   for i, f_i in enumerate(self.F)]).sum(dim=0)
 
-        return y_t, hidden_prev
+        return y_t
 
     @ property
     def soft_coeffs(self):

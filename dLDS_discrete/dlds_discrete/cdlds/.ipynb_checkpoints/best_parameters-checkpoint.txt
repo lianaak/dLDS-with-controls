@@ -1,0 +1,1 @@
+Best parameters: {'smooth': 1.9899752824353658e-05, 'num_subdyn': 3, 'learning_rate': 6.487484454444961e-05, 'epochs': 98, 'batch_size': 64}Best values: ({'loss': 0.6925708055496216}, {'loss': {'loss': 0.0}})

@@ -29,7 +29,7 @@ def main(args):
             {"name": "num_subdyn", 'type': 'choice',
                 'values': [2, 3, 4]},
             {"name": "learning_rate", "type": "range", "bounds": [
-                0.01, 0.00001], "log_scale": True},
+                0.00001, 0.01], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
                 200, 1000], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',

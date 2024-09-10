@@ -20,20 +20,20 @@ class extract_tensor(nn.Module):
 
 
 class AirModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, time_points):
+    def __init__(self, input_size, hidden_size, output_size, time_points, num_subdyn, lookback):
         super().__init__()
 
         self.coeffs = torch.nn.Parameter(torch.tensor(
-            np.random.rand(3, time_points), requires_grad=True))
+            np.random.rand(num_subdyn, time_points), requires_grad=True))
 
         self.F = torch.nn.ParameterList()
 
-        for _ in range(3):
+        for _ in range(num_subdyn):
             f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
                           num_layers=1, batch_first=True, bias=True, bidirectional=True)
             linear = nn.Linear(hidden_size*2, output_size)
             self.F.append(nn.Sequential(
-                f_i, extract_tensor(), linear, nn.BatchNorm1d(50)))
+                f_i, extract_tensor(), linear, nn.BatchNorm1d(lookback)))
 
     def forward(self, x, idx):
         # x = self.F[0](x)
@@ -138,7 +138,7 @@ def main(args):
     input_size = train.shape[1]
 
     model = AirModel(input_size=input_size, hidden_size=hidden_size,
-                     output_size=input_size, time_points=len(timeseries)).float()
+                     output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
 
@@ -146,7 +146,7 @@ def main(args):
     data = TimeSeriesDataset(list(zip(X_train.float(), y_train.float())))
 
     # create an iterable over our data, no shuffling because we want to keep the temporal information
-    loader = torch.utils.data.DataLoader(data, batch_size=64, shuffle=True)
+    loader = torch.utils.data.DataLoader(data, batch_size=args.batch_size, shuffle=True)
 
     initial_teacher_forcing_ratio = 0.5
     final_teacher_forcing_ratio = 0.0

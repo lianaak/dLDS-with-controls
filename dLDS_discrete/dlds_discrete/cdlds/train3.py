@@ -33,7 +33,7 @@ class AirModel(nn.Module):
                           num_layers=1, batch_first=True, bias=True, bidirectional=True)
             linear = nn.Linear(hidden_size*2, output_size)
             self.F.append(nn.Sequential(
-                f_i, extract_tensor(), linear, nn.BatchNorm1d(lookback)))
+                f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
 
     def forward(self, x, idx):
         # x = self.F[0](x)
@@ -146,7 +146,8 @@ def main(args):
     data = TimeSeriesDataset(list(zip(X_train.float(), y_train.float())))
 
     # create an iterable over our data, no shuffling because we want to keep the temporal information
-    loader = torch.utils.data.DataLoader(data, batch_size=args.batch_size, shuffle=True)
+    loader = torch.utils.data.DataLoader(
+        data, batch_size=args.batch_size, shuffle=True)
 
     initial_teacher_forcing_ratio = 0.5
     final_teacher_forcing_ratio = 0.0

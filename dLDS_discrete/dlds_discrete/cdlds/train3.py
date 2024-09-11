@@ -212,7 +212,7 @@ def main(args):
     wandb.log({"train": plt})
 
     fig = util.plotting(model.coeffs.detach().numpy()[
-                        :, :train_size].T, title='coeffs', states=states)
+                        :, :train_size].T, title='coeffs', plot_states=True, states=states)
     wandb.log({"coeffs": fig})
 
     time_series, _ = create_dataset(timeseries, lookback=lookback)
@@ -226,12 +226,12 @@ def main(args):
             recon[i+lookback] = y_pred[-1]
 
     fig = util.plotting(recon.detach().numpy()[
-                        :, -1, :], title='reconstruction', stack_plots=False, states=states)
+                        :, -1, :], title='reconstruction', stack_plots=False, plot_states=True, states=states)
     wandb.log({"multi-step reconstruction": fig})
 
     result = model(time_series.float(), torch.arange(len(timeseries)-lookback))
     fig = util.plotting([time_series[:, -1, :], result.detach().numpy()
-                        [:, -1, :]], title='result', stack_plots=True, states=states)
+                        [:, -1, :]], title='result', stack_plots=True, plot_states=True, states=states)
     wandb.log({"single-step reconstruction": fig})
 
     run.finish()

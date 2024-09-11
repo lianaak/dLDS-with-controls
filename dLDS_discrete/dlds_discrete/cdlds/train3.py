@@ -1,5 +1,6 @@
 
 import argparse
+import stat
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -94,7 +95,8 @@ def create_dataset(dataset, lookback):
 
 def main(args):
 
-    timeseries = np.load('data.npy').T
+    timeseries = np.load(args.data_path).T
+    states = np.load(args.state_path)
 
     # train-test split for time series
     train_size = int(len(timeseries) * 0.8)
@@ -147,7 +149,7 @@ def main(args):
 
     # create an iterable over our data, no shuffling because we want to keep the temporal information
     loader = torch.utils.data.DataLoader(
-        data, batch_size=args.batch_size, shuffle=True)
+        data, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
     initial_teacher_forcing_ratio = 0.5
     final_teacher_forcing_ratio = 0.0
@@ -210,7 +212,7 @@ def main(args):
     wandb.log({"train": plt})
 
     fig = util.plotting(model.coeffs.detach().numpy()[
-                        :, :train_size].T, title='coeffs')
+                        :, :train_size].T, title='coeffs', states=states)
     wandb.log({"coeffs": fig})
 
     time_series, _ = create_dataset(timeseries, lookback=lookback)
@@ -224,12 +226,12 @@ def main(args):
             recon[i+lookback] = y_pred[-1]
 
     fig = util.plotting(recon.detach().numpy()[
-                        :, -1, :], title='reconstruction', stack_plots=False)
+                        :, -1, :], title='reconstruction', stack_plots=False, states=states)
     wandb.log({"multi-step reconstruction": fig})
 
     result = model(time_series.float(), torch.arange(len(timeseries)-lookback))
     fig = util.plotting([time_series[:, -1, :], result.detach().numpy()
-                        [:, -1, :]], title='result', stack_plots=True)
+                        [:, -1, :]], title='result', stack_plots=True, states=states)
     wandb.log({"single-step reconstruction": fig})
 
     run.finish()

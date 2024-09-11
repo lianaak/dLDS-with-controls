@@ -19,6 +19,31 @@ import slim
 from sklearn.linear_model import RANSACRegressor
 
 
+class extract_tensor(torch.nn.Module):
+    def forward(self, x):
+        # Output shape (batch, features, hidden)
+        tensor, _ = x
+        # Reshape shape (batch, hidden)
+        return tensor
+
+
+def create_dataset(dataset, lookback):
+    """Transform a time series into a prediction dataset
+
+    Args:
+        dataset: A numpy array of time series, first dimension is the time steps
+        lookback: Size of window for prediction
+    """
+    X, y = [], []
+    for i in range(len(dataset)-lookback):
+        feature = dataset[i:i+lookback]
+        target = dataset[i+1:i+lookback+1]
+        X.append(feature)
+        y.append(target)
+
+    return torch.tensor(np.array(X)), torch.tensor(np.array(y))
+
+
 class DeepDLDS(torch.nn.Module):
 
     def __init__(self, input_size, hidden_size, output_size, num_subdyn, time_points, fixed_point_change=False, softmax_temperature=1):
@@ -49,12 +74,11 @@ class DeepDLDS(torch.nn.Module):
 
             # torch init
 
-            f_i = torch.nn.LSTM(input_size, hidden_size, num_layers=1,
-                                bias=True, batch_first=True, bidirectional=False)
-
-            f_i_linear = slim.linear.SpectralLinear(
-                hidden_size, output_size, bias=fixed_point_change, sigma_max=1.0, sigma_min=0)
-
+            f_i = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+                                num_layers=1, batch_first=True, bias=True, bidirectional=True)
+            linear = torch.nn.Linear(hidden_size*2, output_size)
+            self.F.append(torch.nn.Sequential(
+                f_i, extract_tensor(), linear, torch.nn.LayerNorm(output_size)))
             # initialize f with identity matrix
             # f_i = torch.nn.Parameter(
             #    torch.eye(input_size), requires_grad=False)
@@ -62,29 +86,9 @@ class DeepDLDS(torch.nn.Module):
             # initialize F
             # f_i.(torch.nn.init.xavier_normal)
 
-            self.F.append(f_i)
-            self.F_linear.append(f_i_linear)
-
-    def forward(self, x_t, t, teacher_forcing_ratio=1.0, y_true=None):
-        y_f = []
-        for i, f_i in enumerate(self.F):
-            out, _ = f_i(x_t.unsqueeze(0))
-            out = out.reshape(-1, self.hidden_size)
-            out = self.F_linear[i](out)
-
-            if type(t) == int:
-                y_f_i = self.coeffs[i, t].item()*out
-            else:
-                y_f_i = self.coeffs[i, t].float()@out
-            y_f.append(y_f_i)
-
-        use_teacher_forcing = True if torch.rand(
-            1).item() < teacher_forcing_ratio else False
-
-        if use_teacher_forcing:
-            y_t = y_true
-        else:
-            y_t = torch.stack(y_f).sum(dim=0)
+    def forward(self, x_t, t):
+        y_t = torch.stack([self.coeffs[i, t].view(-1, 1, 1)*f_i(x_t)
+                           for i, f_i in enumerate(self.F)]).sum(dim=0)
 
         # y_t = torch.stack([self.coeffs[i, t]@self.linear(f_i(x_t.unsqueeze(0))[1])  # + self.Bias[i, t]
         #                  for i, f_i in enumerate(self.F)]).sum(dim=0)
@@ -99,21 +103,23 @@ class DeepDLDS(torch.nn.Module):
     def soft_coeffs(self):
         return torch.nn.functional.softmax(self.coeffs / self.softmax_temperature, dim=0)
 
-    def multi_step(self):
+    def multi_step_loss(X, y, model, loss_fn, lookback, teacher_forcing_ratio=0.5):
+        recon = torch.zeros_like(y)
+        recon[:lookback] = X[:lookback]  # Set initial inputs from X
 
-        _coeffs = self.soft_coeffs
-        Y = torch.zeros((self.step_ahead, self.input_size))
-        y0 = self.batch
-        Y[0, :] = y0
+        for i in range(len(X) - lookback):
+            # Predict next step based on the past 'lookback' steps
+            y_pred = model(recon[i:i + lookback].float(),
+                           torch.arange(i, i + lookback))
 
-        for t in range(self.step_ahead):
-            # combination of all f_i * c_i
-            y = torch.stack([_coeffs[i, t]*f_i(y0)
-                            for i, f_i in enumerate(self.F)]).sum(dim=0)
-            Y[t, :] = y
-            y0 = y
-
-        return Y
+            # Update the reconstruction with the new prediction
+            if torch.rand(1) < teacher_forcing_ratio:
+                # Use actual next value (ground truth)
+                recon[i + lookback] = y[i + lookback]
+            else:
+                recon[i + lookback] = y_pred[-1]
+        # Compute the loss over the entire reconstructed sequence
+        return loss_fn(recon, y)
 
 
 class SimpleNN(torch.nn.Module):

@@ -36,6 +36,8 @@ def main(args):
                 'values': [32, 64, 128]},
             {'name': 'loss_reg', 'type': 'range',
                 'bounds': [0.0001, 1.0], 'log_scale': True},
+            {'name': 'control_sparsity_reg', 'type': 'range',
+                'bounds': [0.0001, 1.0], 'log_scale': True},
             {'name': 'lookback', 'type': 'range',
                 'bounds': [1, 100], 'value_type': 'int'},
             {'name': 'sigma', 'type': 'range', 'bounds': [

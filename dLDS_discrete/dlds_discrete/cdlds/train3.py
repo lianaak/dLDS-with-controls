@@ -10,6 +10,7 @@ import torch.optim as optim
 import torch.utils.data as data
 import wandb
 import util
+import slim
 
 
 class extract_tensor(nn.Module):
@@ -20,14 +21,33 @@ class extract_tensor(nn.Module):
         return tensor
 
 
-class AirModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, time_points, num_subdyn, lookback):
+class DLDSModel(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, time_points, num_subdyn, lookback=50, control_size=1, sparsity_threshold=0.1):
         super().__init__()
+
+        self.control_size = control_size
 
         self.coeffs = torch.nn.Parameter(torch.tensor(
             np.random.rand(num_subdyn, time_points), requires_grad=True))
 
         self.F = torch.nn.ParameterList()
+
+        # Control matrix B (learnable)
+        # self.B = torch.nn.Parameter(
+        #    torch.randn(input_size, control_size, requires_grad=True) * 0.01)
+
+        self.B = slim.linear.SpectralLinear(
+            control_size, input_size, bias=False, sigma_min=0.0, sigma_max=1.0)
+
+        # Learnable control input U (initialize with small values)
+        # U will have the shape: (batch_size, seq_len, control_size)
+        self.U = torch.nn.Parameter(torch.randn(
+            control_size, time_points, requires_grad=True))
+
+        # Store sparsity weight for L1 regularization
+        self.sparsity_threshold = sparsity_threshold
+
+        self.sparsity_pattern = torch.zeros_like(self.U, dtype=torch.bool)
 
         for _ in range(num_subdyn):
             f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
@@ -38,11 +58,45 @@ class AirModel(nn.Module):
 
     def forward(self, x, idx):
         # x = self.F[0](x)
-
-        x = torch.stack([self.coeffs[i, idx].view(-1, 1, 1)*f_i(x)
+        x = torch.stack([self.coeffs[i, idx].view(-1, 1, 1)*f_i(x) + (self.B(self.effective_U[:, idx].T)).unsqueeze(1)
                          for i, f_i in enumerate(self.F)]).sum(dim=0)
 
         return x
+
+    @ property
+    def effective_U(self):
+        return torch.relu(self.U)
+
+    def control_sparsity_loss(self):
+        # L1 regularization for sparsity on the control matrix U
+        return torch.sum(torch.abs(self.effective_U))
+
+    def sparsity_mask(self):
+
+        # self.sparsity_threshold
+
+        for j in range(self.control_size):
+            tmp = torch.relu(self.U)[j, :]
+            print(tmp)
+            threshold = max(torch.quantile(tmp[tmp > 0], 0.3),
+                            torch.min(tmp[tmp > 0]))  # threshold for sparsity pattern, if control_density is 0.1, then we take the 0.1 quantile of the positive values of the control input as the threshold unless it is smaller than the smallest positive value
+
+            above_threshold = tmp > threshold
+
+            # print of tmp those values that are above the threshold
+            # print(
+            #    f'Values under threshold {threshold} in control input {j}: {tmp[~above_threshold]}')
+
+            # update sparsity pattern, if control input is below threshold
+            self.sparsity_pattern[j, :] = ~(above_threshold)
+
+        # set control inputs below threshold to 0
+        with torch.no_grad():
+            self.U[self.sparsity_pattern] = 0
+
+        # if self.U.sum() == 0:
+        #    print('All control inputs are 0')
+        #    return
 
 
 def multi_step_loss(X, y, model, loss_fn, lookback, teacher_forcing_ratio=0.5):
@@ -51,15 +105,16 @@ def multi_step_loss(X, y, model, loss_fn, lookback, teacher_forcing_ratio=0.5):
 
     for i in range(len(X) - lookback):
         # Predict next step based on the past 'lookback' steps
-        y_pred = model(recon[i:i + lookback].float(),
-                       torch.arange(i, i + lookback))
 
         # Update the reconstruction with the new prediction
         if torch.rand(1) < teacher_forcing_ratio:
             # Use actual next value (ground truth)
-            recon[i + lookback] = y[i + lookback]
+            y_pred = model(y[i:i + lookback].float(),
+                           torch.arange(i, i + lookback))
         else:
-            recon[i + lookback] = y_pred[-1]
+            y_pred = model(recon[i:i + lookback].float(),
+                           torch.arange(i, i + lookback))
+        recon[i + lookback] = y_pred[-1]
     # Compute the loss over the entire reconstructed sequence
     return loss_fn(recon, y)
 
@@ -123,7 +178,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
+        project=f"Control_Signals_{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
@@ -139,8 +194,8 @@ def main(args):
     hidden_size = 4
     input_size = train.shape[1]
 
-    model = AirModel(input_size=input_size, hidden_size=hidden_size,
-                     output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
+    model = DLDSModel(input_size=input_size, hidden_size=hidden_size,
+                      output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
 
@@ -164,16 +219,25 @@ def main(args):
             # indices of the batch
             y_pred = model(X_batch.float(), X_train_idx[idx])
 
+            # sparsifying control inputs with mask
+            # model.sparsity_mask()
+            # with torch.no_grad():
+            #    model.U = torch.relu(model.U)
+
             coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
             # L1 norm of the difference
             smooth_reg = coeff_delta.abs().sum()
             smooth_reg_loss = args.smooth * smooth_reg * input_size
 
+            control_sparsity = model.control_sparsity_loss()
+            single_loss = loss_fn(y_pred, y_batch)
             multi_loss = multi_step_loss(
                 X_batch, y_batch, model, loss_fn, lookback, teacher_forcing_ratio)
             loss = smooth_reg_loss + args.loss_reg * \
-                multi_loss + loss_fn(y_pred, y_batch)
+                multi_loss + single_loss + args.control_sparsity_reg * control_sparsity
             wandb.log({'loss': loss.item()})
+            wandb.log({'single_reconstruction_loss': single_loss.item()})
+            wandb.log({'control_sparsity_loss': control_sparsity.item()})
             # wandb.log({'sparsity_loss': sparsity_loss.item()})
             wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
             wandb.log({'multi_reconstruction_loss': multi_loss.item()})
@@ -232,7 +296,15 @@ def main(args):
     result = model(time_series.float(), torch.arange(len(timeseries)-lookback))
     fig = util.plotting([time_series[:, -1, :], result.detach().numpy()
                         [:, -1, :]], title='result', stack_plots=True, plot_states=True, states=states)
-    wandb.log({"single-step reconstruction": fig})
+    wandb.log({"single-step + ground truth reconstruction": fig})
+
+    # print(model.U.detach().numpy())
+
+    # control plot
+    fig = util.plotting(model.effective_U.detach().numpy()[
+                        :, :train_size].T, title='Control Signals')
+
+    wandb.log({"Control Matrix": fig})
 
     run.finish()
 
@@ -246,6 +318,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--reg', type=float, default=0.001)
+    parser.add_argument('--control_sparsity_reg', type=float, default=0.001)
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')

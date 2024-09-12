@@ -11,6 +11,7 @@ import torch.utils.data as data
 import wandb
 import util
 import slim
+import plotly.graph_objects as go
 
 
 class extract_tensor(nn.Module):
@@ -152,6 +153,7 @@ def main(args):
 
     timeseries = np.load(args.data_path).T
     states = np.load(args.state_path)
+    controls = np.load(args.control_path)
 
     # train-test split for time series
     train_size = int(len(timeseries) * 0.8)
@@ -169,6 +171,9 @@ def main(args):
     X_train, y_train = create_dataset(train, lookback=lookback)
     X_test, y_test = create_dataset(test, lookback=lookback)
 
+    # shift states for plotting according to lookback
+    states = states[lookback:]
+
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
     if args.eigenvalue_radius < 0.999:
@@ -178,16 +183,20 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"Control_Signals_{project_name}_{str(args.num_subdyn)}_State_Bias_C-Init_Rand_A-Init_Rand_SpectralLinear",
+        project=f"Control_Signals_{project_name}_{str(args.num_subdyn)}_State_Bias_Init_Rand_LSTM",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
-        name=f"smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_batch_size_{str(args.batch_size)}_random_coeffs",
+        name=f"smooth{str(round(args.smooth, 3))}_fixpoint_change_{str(args.fix_point_change)}_batch_size_{str(args.batch_size)}_lookback_{str(args.lookback)}_epochs_{str(args.epochs)}",
         # Track hyperparameters and run metadata
         config={
             "learning_rate": args.lr,
             "epochs": args.epochs,
             "batch_size": args.batch_size,
+            "num_subdyn": args.num_subdyn,
+            "lookback": args.lookback,
+            "smooth": args.smooth,
+            "control_sparsity_reg": args.control_sparsity_reg
         },
     )
 
@@ -304,6 +313,14 @@ def main(args):
     fig = util.plotting(model.effective_U.detach().numpy()[
                         :, :train_size].T, title='Control Signals')
 
+    fig.add_trace(go.Scatter(
+        x=np.arange(train_size),
+        y=controls[0],
+        mode='lines',
+        line=dict(color='black', width=2),
+        name='true control signals'
+    ))
+
     wandb.log({"Control Matrix": fig})
 
     run.finish()
@@ -322,6 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')
+    parser.add_argument('--control_path', type=str, default='controls.npy')
     parser.add_argument('--lookback', type=int, default=50)
     parser.add_argument('--fix_point_change', type=bool, default=False),
     parser.add_argument('--eigenvalue_radius', type=float, default=0.995),

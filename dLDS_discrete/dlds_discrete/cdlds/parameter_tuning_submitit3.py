@@ -31,7 +31,7 @@ def main(args):
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.01], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
-                200, 1000], "value_type": "int"},
+                200, 500], "value_type": "int"},
             {'name': 'batch_size', 'type': 'choice',
                 'values': [32, 64, 128]},
             {'name': 'loss_reg', 'type': 'range',
@@ -39,7 +39,7 @@ def main(args):
             {'name': 'control_sparsity_reg', 'type': 'range',
                 'bounds': [0.0001, 1.0], 'log_scale': True},
             {'name': 'lookback', 'type': 'range',
-                'bounds': [1, 100], 'value_type': 'int'},
+                'bounds': [50, 150], 'value_type': 'int'},
             {'name': 'sigma', 'type': 'range', 'bounds': [
                 0.0001, 1.0], 'log_scale': True}
         ],
@@ -47,7 +47,7 @@ def main(args):
     )
 
     total_budget = 10
-    num_parallel_jobs = 3
+    num_parallel_jobs = 5
 
     jobs = []
     submitted_jobs = 0
@@ -99,7 +99,7 @@ def train_model(parameters, args):
     num_true_subdyn = parameters['num_subdyn']
 
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=num_true_subdyn, D_control=0, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius)))
+        K=num_true_subdyn, D_control=args.control_size, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius)))
 
     time_points = 1000
 
@@ -132,13 +132,20 @@ def train_model(parameters, args):
 
     np.save(state_path, generator.datasets.z_)
 
+    if args.control_path is None:
+        control_path = f'control_{run_id}.npy'
+    else:
+        control_path = args.control_path
+
+    np.save(control_path, generator.datasets.U_)
+
     # ' --reg ' + str(parameters['reg']) + \
 
     command = 'python ' + args.train_path + ' --data_path ' + data_path + \
         ' --smooth ' + str(parameters['smooth']) + ' --reg ' + str(parameters['reg']) + ' --epochs ' + \
         str(parameters['epochs']) + ' --lr ' + str(parameters['learning_rate']) + \
         ' --num_subdyn ' + str(parameters['num_subdyn']) + ' --dynamics_path ' + \
-        dynamics_path + ' --state_path ' + state_path + \
+        dynamics_path + ' --state_path ' + state_path + ' --control_path ' + control_path + \
         ' --fix_point_change ' + \
         str(fix_point_change) + ' --eigenvalue_radius ' + str(eigenvalue_radius) + \
         ' --batch_size ' + \
@@ -177,8 +184,10 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--dynamics_path', type=str, default=None)
     parser.add_argument('--state_path', type=str, default=None)
+    parser.add_argument('--control_path', type=str, default=None)
     parser.add_argument('--fix_point_change', type=str, default=False)
     parser.add_argument('--eigenvalue_radius', type=str, default=0.99)
+    parser.add_argument('--control_size', type=int, default=0)
     args = parser.parse_args()
     print(args)
     main(args)

@@ -191,7 +191,7 @@ def main(args):
     X_test, y_test = create_dataset(test, lookback=lookback)
 
     # shift states for plotting according to lookback
-    # states = states[lookback:]
+    states = states[lookback:]
 
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 

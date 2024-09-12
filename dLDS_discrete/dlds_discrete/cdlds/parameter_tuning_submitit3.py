@@ -151,7 +151,8 @@ def train_model(parameters, args):
         ' --batch_size ' + \
         str(parameters['batch_size']) + ' --sigma ' + str(parameters['sigma']) + \
         ' --lookback ' + str(parameters['lookback']) + \
-        ' --loss_reg ' + str(parameters['loss_reg'])
+        ' --loss_reg ' + str(parameters['loss_reg']) + \
+        ' --control_sparsity_reg ' + str(parameters['control_sparsity_reg'])
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')

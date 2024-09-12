@@ -364,7 +364,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_subdyn', type=int, default=2)
     parser.add_argument('--reg', type=float, default=0.001)
-    parser.add_argument('--control_sparsity_reg', type=float, default=0.001)
+    parser.add_argument('--control_sparsity_reg', type=float, default=0.0001)
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='states.npy')

@@ -33,7 +33,7 @@ class CdLDSDataGenerator:
     D_control: int = 1
     fix_point_change: bool = True
     eigenvalue_radius: float = 0.99
-
+    set_seed: int = 0
     U_: np.ndarray = None
     z_: np.ndarray = None
 
@@ -59,6 +59,9 @@ class CdLDSDataGenerator:
         Returns:
             np.ndarray: Generated data
         """
+
+        if self.set_seed is not None:
+            np.random.seed(self.set_seed)
 
         self.create_controls(
             n_time_points, discrete_state_maxT=discrete_state_maxT, control_density=control_density)
@@ -90,9 +93,11 @@ class CdLDSDataGenerator:
         assert len(self.A) == 0, "A is already defined"
         assert self.B is None, "B is already defined"
 
+        if self.set_seed is not None:
+            np.random.seed(self.set_seed)
+
         for k in range(self.K):
 
-            np.random.seed(k)
             # define eigenvalues to be on the unit circle
             # eigenvalues on the unit circle, 1j is the imaginary unit such that we can sample points on the entire circle
             # not all values on the unit circle are complex, but we sample only complex ones here for simplicity
@@ -134,6 +139,9 @@ class CdLDSDataGenerator:
             discrete_state_maxT (int, optional): Maximum time interval for each discrete state. Defaults to 200.
             control_density (float, optional): Density of the control input matrix. Defaults to 0.02.
         """
+
+        if self.set_seed is not None:
+            np.random.seed(self.set_seed)
 
         # define time intervals for each discrete state z
         z_interval = np.random.randint(1, discrete_state_maxT, size=T//10)

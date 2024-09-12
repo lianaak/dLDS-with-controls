@@ -99,7 +99,7 @@ def train_model(parameters, args):
     num_true_subdyn = parameters['num_subdyn']
 
     generator = DLDSwithControl(CdLDSDataGenerator(
-        K=num_true_subdyn, D_control=args.control_size, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius)))
+        K=num_true_subdyn, D_control=args.control_size, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius), set_seed=num_true_subdyn))
 
     time_points = 1000
 

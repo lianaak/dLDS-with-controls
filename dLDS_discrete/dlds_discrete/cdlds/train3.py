@@ -1,9 +1,11 @@
 
 import argparse
+from re import U
 import stat
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.decomposition import NMF
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -120,6 +122,23 @@ def multi_step_loss(X, y, model, loss_fn, lookback, teacher_forcing_ratio=0.5):
     return loss_fn(recon, y)
 
 
+def init_U(D_control, X1=None, X2=None, err=None, lookback=50):
+    """Initialize the control input matrix U by applying NMF on the first iteration without control and take the residuals as U
+
+    """
+
+    U_0_init = np.zeros((D_control, lookback))
+    if err is None:
+        err = X2 - (X2 @ np.linalg.pinv(X1)) @ X1
+
+    nnmf = NMF(n_components=D_control, init='random', random_state=0)
+    W = nnmf.fit_transform(np.abs(err))
+    W_max = W.max(axis=0, keepdims=True)
+    U_0 = np.divide(W, W_max, where=W != 0, out=W).T
+
+    return np.concatenate([U_0_init, U_0], axis=1)
+
+
 class TimeSeriesDataset(torch.utils.data.Dataset):
     # TODO: make more explicit
     def __init__(self, data):
@@ -172,7 +191,7 @@ def main(args):
     X_test, y_test = create_dataset(test, lookback=lookback)
 
     # shift states for plotting according to lookback
-    states = states[lookback:]
+    # states = states[lookback:]
 
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
@@ -205,6 +224,16 @@ def main(args):
 
     model = DLDSModel(input_size=input_size, hidden_size=hidden_size,
                       output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
+
+    with torch.no_grad():
+        X1, X2 = create_dataset(timeseries, lookback=lookback)
+        X2_pred = model(X1.float(), np.arange(
+            timeseries.shape[0]-lookback))
+        err = X2 - X2_pred
+
+        model.U = torch.nn.Parameter(torch.tensor(
+            init_U(model.control_size, err=err.detach().numpy()[:, -1, :], lookback=args.lookback), requires_grad=True, dtype=torch.float32))
+
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
 

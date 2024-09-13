@@ -314,7 +314,7 @@ def main(args):
     wandb.log({"train": plt})
 
     fig = util.plotting(model.coeffs.detach().numpy()[
-                        :, :train_size].T, title='coeffs', plot_states=True, states=states)
+                        :, :train_size].T, title='coeffs', plot_states=args.plot_states, states=states)
     wandb.log({"coeffs": fig})
 
     time_series, _ = create_dataset(timeseries, lookback=lookback)
@@ -328,12 +328,12 @@ def main(args):
             recon[i+lookback] = y_pred[-1]
 
     fig = util.plotting(recon.detach().numpy()[
-                        :, -1, :], title='reconstruction', stack_plots=False, plot_states=True, states=states)
+                        :, -1, :], title='reconstruction', stack_plots=False, plot_states=args.plot_states, states=states)
     wandb.log({"multi-step reconstruction": fig})
 
     result = model(time_series.float(), torch.arange(len(timeseries)-lookback))
     fig = util.plotting([time_series[:, -1, :], result.detach().numpy()
-                        [:, -1, :]], title='result', stack_plots=True, plot_states=True, states=states)
+                        [:, -1, :]], title='result', stack_plots=True, plot_states=args.plot_states, states=states)
     wandb.log({"single-step + ground truth reconstruction": fig})
 
     # print(model.U.detach().numpy())
@@ -374,6 +374,7 @@ if __name__ == '__main__':
     parser.add_argument('--eigenvalue_radius', type=float, default=0.995),
     parser.add_argument('--sigma', type=float, default=0.01)
     parser.add_argument('--loss_reg', type=float, default=0.1)
+    parser.add_argument('--plot_states', type=bool, default=True)
     args = parser.parse_args()
     print(args)
     main(args)

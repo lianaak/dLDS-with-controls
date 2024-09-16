@@ -4,6 +4,7 @@ __pycache__/
 
 # data files
 *.h5
+!quartiled_data_1609.h5
 
 
 *.npy

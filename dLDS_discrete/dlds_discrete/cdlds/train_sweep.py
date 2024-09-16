@@ -186,7 +186,7 @@ def calculate_best_correlation(ground_truth, learned, num_subdyn):
             corr_matrix[i, j] = torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
 
     # Convert correlation matrix to negative for minimization
-    cost_matrix = -corr_matrix.numpy()
+    cost_matrix = -corr_matrix.detach().numpy()
 
     # Use the Hungarian algorithm to find the best assignment
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
@@ -198,7 +198,7 @@ def calculate_best_correlation(ground_truth, learned, num_subdyn):
     best_corr_sum = corr_matrix[row_ind, col_ind].sum()
 
     # Return the correlation matrix and the best permutation
-    return corr_matrix.numpy(), best_corr_sum / num_subdyn, best_permutation
+    return corr_matrix.detach().numpy(), best_corr_sum / num_subdyn, best_permutation
 
 
 def main(args):
@@ -326,11 +326,22 @@ def main(args):
             smooth_reg_loss = args.smooth * smooth_reg * input_size
 
             control_sparsity = model.control_sparsity_loss()
+            
+            corr_mat, best_corr, _ = calculate_best_correlation(torch.tensor(one_hot_states).T, model.coeffs.T, K)
+            wandb.log({"coeff_correlation": best_corr})
+            coeff_loss = torch.square(1-best_corr)
+            
+        
+            _, control_corr, _ = calculate_best_correlation(
+                torch.tensor(controls).T, model.U.T, controls.shape[0])
+            wandb.log({"control_correlation": control_corr})
+            control_loss = torch.square(1-control_corr)
+            
             single_loss = loss_fn(y_pred, y_batch)
             multi_loss = multi_step_loss(
                 X_batch, y_batch, model, loss_fn, lookback, teacher_forcing_ratio)
             loss = smooth_reg_loss + args.loss_reg * \
-                multi_loss + single_loss + args.control_sparsity_reg * control_sparsity
+                multi_loss + single_loss + args.control_sparsity_reg * control_sparsity + coeff_loss + control_loss
             wandb.log({'loss': loss.item()})
             wandb.log({'single_reconstruction_loss': single_loss.item()})
             wandb.log({'control_sparsity_loss': control_sparsity.item()})
@@ -374,14 +385,6 @@ def main(args):
         wandb.log({"train": plt})
         
         
-        corr_mat, best_corr, _ = calculate_best_correlation(
-            torch.tensor(one_hot_states).T, model.coeffs.T, K)
-        wandb.log({"coeff_correlation": best_corr})
-        
-        
-        _, control_corr, _ = calculate_best_correlation(
-            torch.tensor(controls).T, model.U.T, controls.shape[0])
-        wandb.log({"control_correlation": control_corr})
     
         # Create the Plotly heatmap
     fig = go.Figure(data=go.Heatmap(

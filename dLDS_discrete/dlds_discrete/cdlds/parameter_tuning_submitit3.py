@@ -27,7 +27,7 @@ def main(args):
             {"name": "smooth", "type": "range", "bounds": [
                 0.00001, 1.00001], "log_scale": True},
             {"name": "num_subdyn", 'type': 'choice',
-                'values': [2, 3, 4]},
+                'values': [2, 3]},
             {"name": "learning_rate", "type": "range", "bounds": [
                 0.00001, 0.01], "log_scale": True},
             {"name": "epochs", "type": "range", "bounds": [
@@ -37,7 +37,7 @@ def main(args):
             {'name': 'loss_reg', 'type': 'range',
                 'bounds': [0.0001, 1.0], 'log_scale': True},
             {'name': 'control_sparsity_reg', 'type': 'range',
-                'bounds': [0.00001, 0.0001], 'log_scale': True},
+                'bounds': [0.0001, 0.0009], 'log_scale': True},
             {'name': 'lookback', 'type': 'range',
                 'bounds': [50, 150], 'value_type': 'int'},
             {'name': 'sigma', 'type': 'range', 'bounds': [
@@ -46,7 +46,7 @@ def main(args):
         objectives={'loss': ObjectiveProperties(minimize=True)}
     )
 
-    total_budget = 10
+    total_budget = 20
     num_parallel_jobs = 5
 
     jobs = []
@@ -136,8 +136,9 @@ def train_model(parameters, args):
         control_path = f'control_{run_id}.npy'
     else:
         control_path = args.control_path
+        
 
-    np.save(control_path, generator.datasets.U_)
+    np.save(control_path, generator.datasets.U_[:args.control_size,:])
 
     # ' --reg ' + str(parameters['reg']) + \
 
@@ -152,7 +153,8 @@ def train_model(parameters, args):
         str(parameters['batch_size']) + ' --sigma ' + str(parameters['sigma']) + \
         ' --lookback ' + str(parameters['lookback']) + \
         ' --loss_reg ' + str(parameters['loss_reg']) + \
-        ' --control_sparsity_reg ' + str(parameters['control_sparsity_reg'])
+        ' --control_sparsity_reg ' + str(parameters['control_sparsity_reg']) + \
+            ' --plot_states ' + str(args.plot_states)
     os.system(command)
     # get the loss
     loss = np.load('loss.npy')
@@ -189,6 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--fix_point_change', type=str, default=False)
     parser.add_argument('--eigenvalue_radius', type=str, default=0.99)
     parser.add_argument('--control_size', type=int, default=0)
+    parser.add_argument('--plot_states', type=bool, default=True)
     args = parser.parse_args()
     print(args)
     main(args)

@@ -14,6 +14,9 @@ import wandb
 import util
 import slim
 import plotly.graph_objects as go
+from scipy.optimize import linear_sum_assignment
+import seaborn as sns
+
 
 
 class extract_tensor(nn.Module):
@@ -63,6 +66,8 @@ class DLDSModel(nn.Module):
         # x = self.F[0](x)
         x = torch.stack([self.coeffs[i, idx].view(-1, 1, 1)*f_i(x) + (self.B(self.effective_U[:, idx].T)).unsqueeze(1)
                          for i, f_i in enumerate(self.F)]).sum(dim=0)
+        
+        
 
         return x
 
@@ -167,9 +172,34 @@ def create_dataset(dataset, lookback):
 
     return torch.tensor(np.array(X)), torch.tensor(np.array(y))
 
+def calculate_best_correlation(ground_truth, learned, num_subdyn):
+    # Calculate pairwise correlations between ground truth and learned coefficients
+    corr_matrix = torch.zeros((num_subdyn, num_subdyn))
+
+    for i in range(num_subdyn):
+        for j in range(num_subdyn):
+            gt_flat = ground_truth[:,i].flatten()
+            learned_flat = learned[:,j].flatten()
+            # Compute correlation between ground truth[i] and learned[j]
+            corr_matrix[i, j] = torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
+
+    # Convert correlation matrix to negative for minimization
+    cost_matrix = -corr_matrix.numpy()
+
+    # Use the Hungarian algorithm to find the best assignment
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+    # Get the optimal permutation
+    best_permutation = col_ind
+
+    # Compute the average correlation for the best permutation
+    best_corr_sum = corr_matrix[row_ind, col_ind].sum()
+
+    # Return the correlation matrix and the best permutation
+    return corr_matrix.numpy(), best_corr_sum / num_subdyn, best_permutation
+
 
 def main(args):
-
     timeseries = np.load(args.data_path).T
     states = np.load(args.state_path)
     controls = np.load(args.control_path)
@@ -190,6 +220,14 @@ def main(args):
     X_train, y_train = create_dataset(train, lookback=lookback)
     X_test, y_test = create_dataset(test, lookback=lookback)
 
+    
+    K = np.unique(states).shape[0]
+    
+    # one hot encode states
+    one_hot_states = np.zeros((K,len(states)))
+    one_hot_states[states,np.arange(len(states))] = 1
+    
+    
     # shift states for plotting according to lookback
     states = states[lookback:]
 
@@ -202,7 +240,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"Control_Signals_{project_name}_{str(args.num_subdyn)}_State_Bias_Init_Rand_LSTM",
+        project=f"TRUE_Control_Coeff_{project_name}_{str(args.num_subdyn)}_State_Bias_Init_Rand_LSTM",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
@@ -218,7 +256,8 @@ def main(args):
             "control_sparsity_reg": args.control_sparsity_reg
         },
     )
-
+    
+    
     hidden_size = 4
     input_size = train.shape[1]
 
@@ -226,13 +265,12 @@ def main(args):
                       output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
 
     with torch.no_grad():
-        X1, X2 = create_dataset(timeseries, lookback=lookback)
-        X2_pred = model(X1.float(), np.arange(
-            timeseries.shape[0]-lookback))
-        err = X2 - X2_pred
-
-        model.U = torch.nn.Parameter(torch.tensor(
-            init_U(model.control_size, err=err.detach().numpy()[:, -1, :], lookback=args.lookback), requires_grad=True, dtype=torch.float32))
+        
+        # Initialize coefficients with one-hot encoded states
+        model.coeffs = torch.nn.Parameter(torch.tensor(one_hot_states, requires_grad=True, dtype=torch.float32))
+        
+        # Initialize control input matrix U and add noise
+        model.U = torch.nn.Parameter(torch.tensor(controls, requires_grad=True, dtype=torch.float32)) # + torch.randn_like(model.U) * args.sigma)
 
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
@@ -263,8 +301,9 @@ def main(args):
             #    model.U = torch.relu(model.U)
 
             coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
-            # L1 norm of the difference
-            smooth_reg = coeff_delta.abs().sum()
+            # L2 norm of the difference between consecutive coefficients
+            smooth_reg = torch.norm(coeff_delta, p=2)
+            
             smooth_reg_loss = args.smooth * smooth_reg * input_size
 
             control_sparsity = model.control_sparsity_loss()
@@ -296,6 +335,8 @@ def main(args):
         print("Epoch %d: train RMSE %.4f, test RMSE %.4f" %
               (epoch, train_rmse, test_rmse))
 
+    print("Training finished")
+    print('Storing visualizations..')
     with torch.no_grad():
         # shift train predictions for plotting
         train_plot = np.ones_like(timeseries) * np.nan
@@ -307,11 +348,37 @@ def main(args):
         test_plot = np.ones_like(timeseries) * np.nan
         test_plot[train_size+lookback:len(timeseries)
                   ] = model(X_test.float(), X_test_idx)[:, -1, :]
-    # plot
-    plt.plot(timeseries)
-    plt.plot(train_plot, c='r')
-    plt.plot(test_plot, c='g')
-    wandb.log({"train": plt})
+        # plot
+        plt.plot(timeseries)
+        plt.plot(train_plot, c='r')
+        plt.plot(test_plot, c='g')
+        wandb.log({"train": plt})
+        
+        
+        corr_mat, best_corr, _ = calculate_best_correlation(
+            torch.tensor(one_hot_states).T, model.coeffs.T, K)
+        wandb.log({"coeff_correlation": best_corr})
+        
+        
+        _, control_corr, _ = calculate_best_correlation(
+            torch.tensor(controls).T, model.U.T, controls.shape[0])
+        wandb.log({"control_correlation": control_corr})
+    
+        # Create the Plotly heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=corr_mat,
+        x=[f'Learned {i+1}' for i in range(K)],
+        y=[f'True {i+1}' for i in range(K)],
+        colorscale='Viridis',
+        zmin=-1, zmax=1,
+        hoverongaps=False,
+        text=corr_mat.round(2),
+        hoverinfo="text",
+    ))
+
+    
+
+    wandb.log({"correlation_matrix": fig})
 
     fig = util.plotting(model.coeffs.detach().numpy()[
                         :, :train_size].T, title='coeffs', plot_states=args.plot_states, states=states)

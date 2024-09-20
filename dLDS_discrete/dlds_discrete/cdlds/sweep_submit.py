@@ -7,7 +7,7 @@ executor = submitit.AutoExecutor(folder="submitit_logs")
 executor.update_parameters(
     nodes=1,  # Number of nodes
     tasks_per_node=4,  # Number of tasks per node (GPUs, etc.)
-    timeout_min=60,  # Max duration of the job in minutes
+    timeout_min=300,  # Max duration of the job in minutes
     cpus_per_task=4,
     mem_gb=32,
     gpus_per_node=1,  # Number of GPUs per node
@@ -17,7 +17,7 @@ executor.update_parameters(
 def launch_training():
     import wandb
     import os
-    os.system("python -m wandb agent lianaakobian-university-of-vienna/TRUE_Control_Coeff_Oscillatory_FastDecay_2_State_Bias_Init_Rand_LSTM/4a0rzujk")
+    os.system("python -m wandb agent lianaakobian-university-of-vienna/2_State_TRUE_Control_Coeff_Oscillatory_FastDecay_LSTM/6jh3nnpj")
     # Initialize W&B Sweep agent to pull hyperparameter configs
     #wandb.agent("4a0rzujk", function=main, count=4)  # count=4 for 4 tasks per node
 

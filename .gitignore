@@ -12,6 +12,7 @@ __pycache__/
 !data.npy
 !As.npy
 !worm_data_low.npy
+!worm_DS1_low.npy
 *.png
 
 # virtualenv
@@ -33,5 +34,6 @@ dLDS_discrete/dlds_discrete/cdlds/models_temp_NN.py
 
 # submitit jobs
 submitit_jobs/
+submitit_logs/
 dLDS_discrete/dlds_discrete/cdlds/airline-passengers.csv
 dLDS_discrete/dlds_discrete/cdlds/data.npy

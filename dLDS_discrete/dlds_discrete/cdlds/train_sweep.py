@@ -1,5 +1,6 @@
 
 import argparse
+import itertools
 from re import U
 import stat
 import matplotlib.pyplot as plt
@@ -87,7 +88,7 @@ class DLDSModel(nn.Module):
 
         for j in range(self.control_size):
             tmp = torch.relu(self.U)[j, :]
-            print(tmp)
+            #print(tmp)
             threshold = max(torch.quantile(tmp[tmp > 0], 0.3),
                             torch.min(tmp[tmp > 0]))  # threshold for sparsity pattern, if control_density is 0.1, then we take the 0.1 quantile of the positive values of the control input as the threshold unless it is smaller than the smallest positive value
 
@@ -177,14 +178,35 @@ def create_dataset(dataset, lookback):
 def calculate_best_correlation(ground_truth, learned, num_subdyn):
     # Calculate pairwise correlations between ground truth and learned coefficients
     corr_matrix = torch.zeros((num_subdyn, num_subdyn))
+    
+    #permutations = list(itertools.permutations(range(num_subdyn)))  # Get all permutations of the subdynamics
+    # Initialize minimum MSE and best permutation
+    #min_mse = float('inf')
+    #best_permutation = None
+
+    # Iterate over all permutations
+    #for perm in permutations:
+    #    permuted_learned = learned[list(perm), :]  # Apply the row permutation to the learned coefficients
+    #    mse = torch.mean((ground_truth - permuted_learned)**2)
+        
+        # Keep track of the best permutation with the lowest MSE
+    #    if mse < min_mse:
+    #        min_mse = mse
+    #        best_permutation = perm
+    
+    from scipy.stats import pointbiserialr
+
 
     for i in range(num_subdyn):
         for j in range(num_subdyn):
             gt_flat = ground_truth[:,i].flatten()
             learned_flat = learned[:,j].flatten()
+            
+            r_pb, _ = pointbiserialr(gt_flat.detach().numpy(), learned_flat.detach().numpy())
             # Compute correlation between ground truth[i] and learned[j]
-            corr_matrix[i, j] = torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
+            corr_matrix[i, j] = r_pb #torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
 
+    #print(corr_matrix)
     # Convert correlation matrix to negative for minimization
     cost_matrix = -corr_matrix.detach().numpy()
 
@@ -195,33 +217,36 @@ def calculate_best_correlation(ground_truth, learned, num_subdyn):
     best_permutation = col_ind
 
     # Compute the average correlation for the best permutation
-    best_corr_sum = corr_matrix[row_ind, col_ind].sum()
+    # average
+    best_corr_sum = corr_matrix[row_ind, col_ind].mean()
 
     # Return the correlation matrix and the best permutation
-    return corr_matrix.detach().numpy(), best_corr_sum / num_subdyn, best_permutation
+    return corr_matrix.detach().numpy(), best_corr_sum, best_permutation
 
 
 def main(args):
     
     fix_point_change = args.fix_point_change
     eigenvalue_radius = args.eigenvalue_radius
-
-    num_true_subdyn = args.num_subdyn
-
-    generator = DLDSwithControl(CdLDSDataGenerator(
-        K=num_true_subdyn, D_control=args.control_size, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius), set_seed=num_true_subdyn))
-
-    time_points = 1000
-
-    # generate toy data
-    timeseries = generator.datasets.generate_data(time_points, sigma=0.01).T
-    states = generator.datasets.z_
-    controls = generator.datasets.U_[:args.control_size,:]
     
+    if args.generate_data:
+
+        num_true_subdyn = args.num_subdyn
+
+        generator = DLDSwithControl(CdLDSDataGenerator(
+            K=num_true_subdyn, D_control=args.control_size, fix_point_change=fix_point_change, eigenvalue_radius=float(eigenvalue_radius), set_seed=num_true_subdyn))
+
+        time_points = 1000
+
+        # generate toy data
+        timeseries = generator.datasets.generate_data(time_points, sigma=0.01).T
+        states = generator.datasets.z_
+        controls = generator.datasets.U_[:args.control_size,:]
     
-    #timeseries = np.load(args.data_path).T
-    #states = np.load(args.state_path)
-    #controls = np.load(args.control_path)
+    else:
+        timeseries = np.load(args.data_path).T
+        states = np.load(args.state_path)
+        controls = np.load(args.control_path)
 
     # train-test split for time series
     train_size = int(len(timeseries) * 0.8)
@@ -246,9 +271,12 @@ def main(args):
     one_hot_states = np.zeros((K,len(states)))
     one_hot_states[states,np.arange(len(states))] = 1
     
+    corr_states = states.copy()
     
     # shift states for plotting according to lookback
     states = states[lookback:]
+    
+    
 
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
@@ -259,7 +287,7 @@ def main(args):
 
     run = wandb.init(
         # Set the project where this run will be logged
-        project=f"TRUE_Control_Coeff_{project_name}_{str(args.num_subdyn)}_State_Bias_Init_Rand_LSTM",
+        project=f"{str(args.num_subdyn)}_State_TRUE_Control_Coeff_{project_name}_LSTM",
         # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
         # name of the run is a combination of the model name and a timestamp
         # reg{str(round(args.reg, 3))}_
@@ -340,14 +368,14 @@ def main(args):
             single_loss = loss_fn(y_pred, y_batch)
             multi_loss = multi_step_loss(
                 X_batch, y_batch, model, loss_fn, lookback, teacher_forcing_ratio)
-            loss = smooth_reg_loss + args.loss_reg * \
-                multi_loss + single_loss + args.control_sparsity_reg * control_sparsity + coeff_loss + control_loss
+            loss = smooth_reg_loss + single_loss + args.control_sparsity_reg * control_sparsity + coeff_loss + control_loss # + args.loss_reg * \
+                # multi_loss 
             wandb.log({'loss': loss.item()})
             wandb.log({'single_reconstruction_loss': single_loss.item()})
             wandb.log({'control_sparsity_loss': control_sparsity.item()})
             # wandb.log({'sparsity_loss': sparsity_loss.item()})
             wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
-            wandb.log({'multi_reconstruction_loss': multi_loss.item()})
+            #wandb.log({'multi_reconstruction_loss': multi_loss.item()})
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 7)
@@ -394,7 +422,7 @@ def main(args):
         colorscale='Viridis',
         zmin=-1, zmax=1,
         hoverongaps=False,
-        text=corr_mat.round(2),
+        text=corr_mat.round(3),
         hoverinfo="text",
     ))
 
@@ -403,7 +431,7 @@ def main(args):
     wandb.log({"correlation_matrix": fig})
 
     fig = util.plotting(model.coeffs.detach().numpy()[
-                        :, :train_size].T, title='coeffs', plot_states=args.plot_states, states=states)
+                        :, :train_size].T, title='coeffs', plot_states=args.plot_states, states=corr_states)
     wandb.log({"coeffs": fig})
 
     time_series, _ = create_dataset(timeseries, lookback=lookback)
@@ -465,8 +493,9 @@ if __name__ == '__main__':
     parser.add_argument('--fix_point_change', type=bool, default=False),
     parser.add_argument('--eigenvalue_radius', type=float, default=0.995),
     parser.add_argument('--sigma', type=float, default=0.01)
-    parser.add_argument('--loss_reg', type=float, default=0.1)
+    # parser.add_argument('--loss_reg', type=float, default=0.1)
     parser.add_argument('--plot_states', type=bool, default=True)
+    parser.add_argument('--generate_data', type=bool, default=False)
     args = parser.parse_args()
     print(args)
     main(args)

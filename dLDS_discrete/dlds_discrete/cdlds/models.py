@@ -19,6 +19,130 @@ import slim
 from sklearn.linear_model import RANSACRegressor
 
 
+
+class CDLDSModel(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, time_points, num_subdyn, control_size=1, sparsity_threshold=0.1):
+        super().__init__()
+
+        self.control_size = control_size
+
+        self.coeffs = torch.nn.Parameter(torch.tensor(
+            np.random.rand(num_subdyn, time_points), requires_grad=True))
+
+        self.F = torch.nn.ParameterList()
+
+        # Control matrix B (learnable)
+        # self.B = torch.nn.Parameter(
+        #    torch.randn(input_size, control_size, requires_grad=True) * 0.01)
+
+        self.B = slim.linear.SpectralLinear(
+            control_size, input_size, bias=False, sigma_min=0.0, sigma_max=1.0)
+
+        # self.B = nn.Linear(control_size, input_size, bias=True)
+
+        # Learnable control input U (initialize with small values)
+        # U will have the shape: (batch_size, seq_len, control_size)
+        self.U = torch.nn.Parameter(torch.randn(
+            control_size, time_points, requires_grad=True))
+
+        # Store sparsity weight for L1 regularization
+        self.sparsity_threshold = sparsity_threshold
+
+        self.sparsity_pattern = torch.zeros_like(self.U, dtype=torch.bool)
+
+        for _ in range(num_subdyn):
+            # f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+            #              num_layers=1, batch_first=True, bias=True, bidirectional=True)
+            # linear = nn.Linear(hidden_size*2, output_size)
+            # self.F.append(nn.Sequential(
+            #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
+            f_i = torch.nn.Linear(input_size, output_size, bias=True)
+            self.F.append(f_i)
+
+    def forward(self, x, idx):
+
+        batch_size = x.shape[0]
+
+        dim = 1 if batch_size > 1 else 0
+
+        x = torch.stack([self.coeffs[i, idx].unsqueeze(dim)*f_i(x) + (self.B(self.effective_U[:, idx].view(-1, 1)))
+                         for i, f_i in enumerate(self.F)]).sum(dim=0)
+
+        return x
+
+    @ property
+    def effective_U(self):
+        return torch.relu(self.U)
+
+    def control_sparsity_loss(self):
+        # L1 regularization for sparsity on the control matrix U
+        return torch.sum(torch.abs(self.effective_U))
+    
+    
+    
+class IdentityModel(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, time_points, num_subdyn, control_size=1, sparsity_threshold=0.1):
+        super().__init__()
+
+        self.control_size = control_size
+
+        self.coeffs = torch.nn.Parameter(torch.tensor(
+            np.random.rand(num_subdyn, time_points), requires_grad=True))
+
+        self.F = torch.nn.ParameterList()
+
+        # Control matrix B (learnable)
+        # self.B = torch.nn.Parameter(
+        #    torch.randn(input_size, control_size, requires_grad=True) * 0.01)
+
+        self.B = slim.linear.SpectralLinear(
+            control_size, input_size, bias=False, sigma_min=0.0, sigma_max=1.0)
+
+        # self.B = nn.Linear(control_size, input_size, bias=True)
+
+        # Learnable control input U (initialize with small values)
+        # U will have the shape: (batch_size, seq_len, control_size)
+        self.U = torch.nn.Parameter(torch.randn(
+            control_size, time_points, requires_grad=True))
+
+        # Store sparsity weight for L1 regularization
+        self.sparsity_threshold = sparsity_threshold
+
+        self.sparsity_pattern = torch.zeros_like(self.U, dtype=torch.bool)
+
+        for _ in range(num_subdyn):
+            # f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+            #              num_layers=1, batch_first=True, bias=True, bidirectional=True)
+            # linear = nn.Linear(hidden_size*2, output_size)
+            # self.F.append(nn.Sequential(
+            #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
+            # f_i = torch.nn.Linear(input_size, output_size, bias=True)
+            
+            # initialize f with identity matrix
+            f_i = torch.nn.Parameter(
+                torch.eye(input_size), requires_grad=True)
+            self.F.append(f_i)
+
+    def forward(self, x, idx):
+
+        batch_size = x.shape[0]
+
+        dim = 1 if batch_size > 1 else 0
+
+        x = torch.stack([self.coeffs[i, idx].unsqueeze(dim)*f_i(x) + (self.B(self.effective_U[:, idx].view(-1, 1)))
+                         for i, f_i in enumerate(self.F)]).sum(dim=0)
+
+        return x
+
+    @ property
+    def effective_U(self):
+        return torch.relu(self.U)
+
+    def control_sparsity_loss(self):
+        # L1 regularization for sparsity on the control matrix U
+        return torch.sum(torch.abs(self.effective_U))    
+
+
 class DeepDLDS(torch.nn.Module):
 
     def __init__(self, input_size, output_size, num_subdyn, time_points, fixed_point_change=False, softmax_temperature=1):

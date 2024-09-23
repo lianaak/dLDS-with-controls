@@ -19,8 +19,10 @@ class CdLDSDataGenerator:
         Number of discrete states
     D_control : int
         Number of control inputs
-    z_ : numpy array
+    states_ : numpy array
         Discrete states
+    coefficients_ : numpy array
+        Coefficients for each matrix
     U_ : numpy array
         Control inputs
 
@@ -35,7 +37,8 @@ class CdLDSDataGenerator:
     eigenvalue_radius: float = 0.99
     set_seed: int = 0
     U_: np.ndarray = None
-    z_: np.ndarray = None
+    coefficients_: np.ndarray = None
+    states_: np.ndarray = None
 
     def __post_init__(self):
         if len(self.A) == 0 and self.B is None:
@@ -72,7 +75,7 @@ class CdLDSDataGenerator:
 
         # generate with multi step reconstruction
         x = self.multi_step_reconstruction(
-            n_time_points=n_time_points, X0=initial_conditions, A=self.A, B=self.B,  U=self.U_, z=self.z_)
+            n_time_points=n_time_points, X0=initial_conditions, A=self.A, B=self.B,  U=self.U_, coeffs=self.coefficients_)
 
         # add noise
         if sigma > 0:
@@ -157,7 +160,7 @@ class CdLDSDataGenerator:
                 current_state = (current_state + 1) % self.K
                 z[start:end] = current_state
 
-        self.z_ = z
+        self.states_ = z
 
         # Define control input
         u_temp = sparse.rand(self.D_control, T, density=control_density,
@@ -169,10 +172,13 @@ class CdLDSDataGenerator:
             z_one_hot = np.zeros((self.K, T))
             z_one_hot[z, np.arange(T)] = 1
             self.U_ = sparse.vstack((u_temp, z_one_hot)).toarray()
+
+            self.coefficients_ = z_one_hot
+
         else:
             self.U_ = u_temp.toarray()
 
-    def single_step_reconstruction(self, x, A, B, u):
+    def single_step_reconstruction(self, x, A, B, u, z):
         """Single step of the system
 
         Args:
@@ -184,9 +190,9 @@ class CdLDSDataGenerator:
         Returns:
             np.ndarray: Next state
         """
-        return A @ x + B @ u
+        return z * (A @ x) + B @ u
 
-    def multi_step_reconstruction(self, n_time_points, X0, A, B, U, z):
+    def multi_step_reconstruction(self, n_time_points, X0, A, B, U, coeffs):
         """Multi step of the system
 
         Args:
@@ -206,7 +212,7 @@ class CdLDSDataGenerator:
         X_reconstructed[:, 0] = X0
 
         for t in range(1, n_time_points):
-            X_reconstructed[:, t] = self.single_step_reconstruction(
-                x=X_reconstructed[:, t-1], A=A[z[t]], B=B, u=U[:, t-1])
+            X_reconstructed[:, t] = np.dstack([self.single_step_reconstruction(
+                x=X_reconstructed[:, t-1], A=A_i, B=B, u=U[:, t-1], z=coeffs[i, t-1]) for i, A_i in enumerate(A)]).sum(axis=2)
 
         return X_reconstructed

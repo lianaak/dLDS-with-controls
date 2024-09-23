@@ -22,17 +22,18 @@ from scipy.optimize import linear_sum_assignment
 import seaborn as sns
 
 
-
 class extract_tensor(nn.Module):
     def forward(self, x):
         # Output shape (batch, features, hidden)
         tensor, _ = x
         # Reshape shape (batch, hidden)
-        
+
         # print(tensor.shape)
         return tensor
 
 # add an attention mechanism to the LSTM model
+
+
 class AttentionLayer(nn.Module):
     def __init__(self, hidden_size):
         super(AttentionLayer, self).__init__()
@@ -41,24 +42,24 @@ class AttentionLayer(nn.Module):
         # slim.linear.SpectralLinear(hidden_size, hidden_size, bias=False)
         self.query = nn.Linear(hidden_size, hidden_size, bias=False)
         self.value = nn.Linear(hidden_size, hidden_size, bias=False)
-    
+
     def forward(self, x):
-        
+
         # print(x.shape)
         key = self.key(x)
         query = self.query(x)
         value = self.value(x)
-        
+
         # Attention mechanism
-        attention = torch.matmul(query, key.transpose(1, 2)) / np.sqrt(self.hidden_size) # (batch, seq_len, seq_len)
+        attention = torch.matmul(query, key.transpose(
+            1, 2)) / np.sqrt(self.hidden_size)  # (batch, seq_len, seq_len)
         attention = torch.softmax(attention, dim=2)
         # Attention weights
         x = torch.matmul(attention, value)
         return x
         # self.attn = slim.linear.SpectralLinear(hidden_size, 1, bias=False)
         # self.softmax = nn.Softmax(dim=1)
-        #self.attn = nn.Linear(self.hidden_size, 1)
-    
+        # self.attn = nn.Linear(self.hidden_size, 1)
 
 
 class DLDSModel(nn.Module):
@@ -94,17 +95,16 @@ class DLDSModel(nn.Module):
                           num_layers=1, batch_first=True, bias=True, bidirectional=True)
             attention = AttentionLayer(hidden_size*2)
             linear = nn.Linear(hidden_size*2, output_size)
-            
+
             # self.F.append(nn.Sequential(
             #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
-            self.F.append(nn.Sequential(f_i, extract_tensor(), attention, linear, nn.LayerNorm(output_size)))
+            self.F.append(nn.Sequential(f_i, extract_tensor(),
+                          attention, linear, nn.LayerNorm(output_size)))
 
     def forward(self, x, idx):
         # x = self.F[0](x)
         x = torch.stack([self.coeffs[i, idx].view(-1, 1, 1)*f_i(x) + (self.B(self.effective_U[:, idx].T)).unsqueeze(1)
                          for i, f_i in enumerate(self.F)]).sum(dim=0)
-        
-        
 
         return x
 
@@ -122,7 +122,7 @@ class DLDSModel(nn.Module):
 
         for j in range(self.control_size):
             tmp = torch.relu(self.U)[j, :]
-            #print(tmp)
+            # print(tmp)
             threshold = max(torch.quantile(tmp[tmp > 0], 0.3),
                             torch.min(tmp[tmp > 0]))  # threshold for sparsity pattern, if control_density is 0.1, then we take the 0.1 quantile of the positive values of the control input as the threshold unless it is smaller than the smallest positive value
 
@@ -209,38 +209,40 @@ def create_dataset(dataset, lookback):
 
     return torch.tensor(np.array(X)), torch.tensor(np.array(y))
 
+
 def calculate_best_correlation(ground_truth, learned, num_subdyn):
     # Calculate pairwise correlations between ground truth and learned coefficients
     corr_matrix = torch.zeros((num_subdyn, num_subdyn))
-    
-    #permutations = list(itertools.permutations(range(num_subdyn)))  # Get all permutations of the subdynamics
+
+    # permutations = list(itertools.permutations(range(num_subdyn)))  # Get all permutations of the subdynamics
     # Initialize minimum MSE and best permutation
-    #min_mse = float('inf')
-    #best_permutation = None
+    # min_mse = float('inf')
+    # best_permutation = None
 
     # Iterate over all permutations
-    #for perm in permutations:
+    # for perm in permutations:
     #    permuted_learned = learned[list(perm), :]  # Apply the row permutation to the learned coefficients
     #    mse = torch.mean((ground_truth - permuted_learned)**2)
-        
-        # Keep track of the best permutation with the lowest MSE
+
+    # Keep track of the best permutation with the lowest MSE
     #    if mse < min_mse:
     #        min_mse = mse
     #        best_permutation = perm
-    
-    from scipy.stats import pointbiserialr
 
+    from scipy.stats import pointbiserialr
 
     for i in range(num_subdyn):
         for j in range(num_subdyn):
-            gt_flat = ground_truth[:,i].flatten()
-            learned_flat = learned[:,j].flatten()
-            
-            r_pb, _ = pointbiserialr(gt_flat.detach().numpy(), learned_flat.detach().numpy())
-            # Compute correlation between ground truth[i] and learned[j]
-            corr_matrix[i, j] = r_pb #torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
+            gt_flat = ground_truth[:, i].flatten()
+            learned_flat = learned[:, j].flatten()
 
-    #print(corr_matrix)
+            r_pb, _ = pointbiserialr(
+                gt_flat.detach().numpy(), learned_flat.detach().numpy())
+            # Compute correlation between ground truth[i] and learned[j]
+            # torch.corrcoef(torch.stack((gt_flat, learned_flat)))[0, 1]
+            corr_matrix[i, j] = r_pb
+
+    # print(corr_matrix)
     # Convert correlation matrix to negative for minimization
     cost_matrix = -corr_matrix.detach().numpy()
 
@@ -259,10 +261,10 @@ def calculate_best_correlation(ground_truth, learned, num_subdyn):
 
 
 def main(args):
-    
+
     fix_point_change = args.fix_point_change
     eigenvalue_radius = args.eigenvalue_radius
-    
+
     if args.generate_data:
 
         num_true_subdyn = args.num_subdyn
@@ -273,15 +275,16 @@ def main(args):
         time_points = 1000
 
         # generate toy data
-        timeseries = generator.datasets.generate_data(time_points, sigma=0.01).T
+        timeseries = generator.datasets.generate_data(
+            time_points, sigma=0.01).T
         states = generator.datasets.z_
-        controls = generator.datasets.U_[:args.control_size,:]
-    
+        controls = generator.datasets.U_[:args.control_size, :]
+
     else:
         timeseries = np.load(args.data_path).T
         states = np.load(args.state_path)
         controls = np.load(args.control_path)
-        
+
         if args.time_points:
             timeseries = timeseries[:args.time_points]
             states = states[:args.time_points]
@@ -303,19 +306,16 @@ def main(args):
     X_train, y_train = create_dataset(train, lookback=lookback)
     X_test, y_test = create_dataset(test, lookback=lookback)
 
-    
     K = np.unique(states).shape[0]
-    
+
     # one hot encode states
-    one_hot_states = np.zeros((K,len(states)))
-    one_hot_states[states,np.arange(len(states))] = 1
-    
+    one_hot_states = np.zeros((K, len(states)))
+    one_hot_states[states, np.arange(len(states))] = 1
+
     corr_states = states.copy()
-    
+
     # shift states for plotting according to lookback
     states = states[lookback:]
-    
-    
 
     wandb.login(key='a79ac9d4509caa0d5e477c939a41d790e7711171')
 
@@ -342,8 +342,7 @@ def main(args):
             "control_sparsity_reg": args.control_sparsity_reg
         },
     )
-    
-    
+
     hidden_size = 4
     input_size = train.shape[1]
 
@@ -351,12 +350,15 @@ def main(args):
                       output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, lookback=args.lookback).float()
 
     with torch.no_grad():
-        
+
         # Initialize coefficients with one-hot encoded states
-        model.coeffs = torch.nn.Parameter(torch.tensor(one_hot_states, requires_grad=True, dtype=torch.float32))
-        
+        model.coeffs = torch.nn.Parameter(torch.tensor(
+            one_hot_states, requires_grad=True, dtype=torch.float32))
+
         # Initialize control input matrix U and add noise
-        model.U = torch.nn.Parameter(torch.tensor(controls, requires_grad=True, dtype=torch.float32)) # + torch.randn_like(model.U) * args.sigma)
+        # + torch.randn_like(model.U) * args.sigma)
+        model.U = torch.nn.Parameter(torch.tensor(
+            controls, requires_grad=True, dtype=torch.float32))
 
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
@@ -389,29 +391,27 @@ def main(args):
             coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
             # L2 norm of the difference between consecutive coefficients
             smooth_reg = torch.norm(coeff_delta, p=2)
-            
+
             smooth_reg_loss = args.smooth * smooth_reg * input_size
 
             control_sparsity = model.control_sparsity_loss()
             control_sparsity_loss = args.control_sparsity_reg * control_sparsity
-            
-            corr_mat, best_corr, _ = calculate_best_correlation(torch.tensor(one_hot_states).T, model.coeffs.T, K)
+
+            corr_mat, best_corr, _ = calculate_best_correlation(
+                torch.tensor(one_hot_states).T, model.coeffs.T, K)
             wandb.log({"coeff_correlation": best_corr})
             coeff_loss = torch.square(1-best_corr)
-            
-        
+
             # _, control_corr, _ = calculate_best_correlation(
             #    torch.tensor(controls).T, model.U.T, controls.shape[0])
             # wandb.log({"control_correlation": control_corr})
             # control_loss = torch.square(1-control_corr)
-            
-            
-            
+
             single_loss = loss_fn(y_pred, y_batch)
             multi_loss = multi_step_loss(
                 X_batch, y_batch, model, loss_fn, lookback, teacher_forcing_ratio)
             loss = smooth_reg_loss + single_loss + control_sparsity_loss + coeff_loss + args.loss_reg * \
-                 multi_loss  # + control_loss
+                multi_loss  # + control_loss
             wandb.log({'loss': loss.item()})
             wandb.log({'single_reconstruction_loss': single_loss.item()})
             wandb.log({'control_sparsity_loss': control_sparsity_loss.item()})
@@ -453,9 +453,7 @@ def main(args):
         plt.plot(train_plot, c='r')
         plt.plot(test_plot, c='g')
         wandb.log({"train": plt})
-        
-        
-    
+
         # Create the Plotly heatmap
     fig = go.Figure(data=go.Heatmap(
         z=corr_mat,
@@ -467,8 +465,6 @@ def main(args):
         text=corr_mat.round(3),
         hoverinfo="text",
     ))
-
-    
 
     wandb.log({"correlation_matrix": fig})
 
@@ -485,10 +481,8 @@ def main(args):
             y_pred = model(recon[i:i+lookback].float(),
                            torch.arange(i, i+lookback))
             recon[i+lookback] = y_pred[-1]
-    
-    
 
-    fig = util.plotting([time_series[:, -1, :],recon.detach().numpy()[
+    fig = util.plotting([time_series[:, -1, :], recon.detach().numpy()[
                         :, -1, :]], title='multi-step reconstruction', stack_plots=True, plot_states=args.plot_states, states=states)
     wandb.log({"multi-step + ground truth reconstruction": fig})
 
@@ -529,7 +523,8 @@ if __name__ == '__main__':
     parser.add_argument('--smooth', type=float, default=0.0001)
     parser.add_argument('--dynamics_path', type=str, default='As.npy')
     parser.add_argument('--state_path', type=str, default='worm_states.npy')
-    parser.add_argument('--control_path', type=str, default='worm_controls.npy')
+    parser.add_argument('--control_path', type=str,
+                        default='worm_controls.npy')
     parser.add_argument('--control_size', type=int, default=1)
     parser.add_argument('--lookback', type=int, default=50)
     parser.add_argument('--fix_point_change', type=bool, default=False),

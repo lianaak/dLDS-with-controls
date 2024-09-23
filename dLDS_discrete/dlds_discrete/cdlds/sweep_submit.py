@@ -14,12 +14,16 @@ executor.update_parameters(
 )
 
 # Function to be executed on each node
+
+
 def launch_training():
     import wandb
     import os
-    os.system("python -m wandb agent lianaakobian-university-of-vienna/2_State_TRUE_Control_Coeff_Oscillatory_FastDecay_LSTM/6jh3nnpj")
+    os.system(
+        "python -m wandb agent lianaakobian-university-of-vienna/PROTOTYPE_2_State_ALL_TRUE/k95ukm6f")
     # Initialize W&B Sweep agent to pull hyperparameter configs
-    #wandb.agent("4a0rzujk", function=main, count=4)  # count=4 for 4 tasks per node
+    # wandb.agent("4a0rzujk", function=main, count=4)  # count=4 for 4 tasks per node
+
 
 # Submit the jobs
 job = executor.submit(launch_training)

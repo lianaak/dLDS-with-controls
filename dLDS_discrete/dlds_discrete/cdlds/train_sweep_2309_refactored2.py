@@ -30,8 +30,6 @@ class extract_tensor(nn.Module):
         return tensor
 
 
-
-
 class TimeSeriesDataset(torch.utils.data.Dataset):
     # TODO: make more explicit
     def __init__(self, data):
@@ -129,7 +127,6 @@ def main(args):
     test_size = len(timeseries) - train_size
     train, test = timeseries[:train_size], timeseries[train_size:]
 
-
     X_train = torch.tensor(train[:-1])  # .unsqueeze(0)
     y_train = torch.tensor(train[1:])  # .unsqueeze(0)
 
@@ -176,10 +173,10 @@ def main(args):
     input_size = train.shape[1]
 
     model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
-                      output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
-    
+                       output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
+
     dummy_model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
-                        output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
+                             output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
 
     with torch.no_grad():
 
@@ -187,23 +184,24 @@ def main(args):
 
             # Initialize f_i with true dynamics
             for f_i, A in zip(model.F, true_dynamics):
-                f_i.weight = torch.nn.Parameter(torch.tensor(A).float()) # + torch.randn_like(f_i.weight) * args.sigma)
-                
-            # initialize dummy model with Identity matrix
+                # + torch.randn_like(f_i.weight) * args.sigma)
+                f_i.weight = torch.nn.Parameter(torch.tensor(A).float())
+
+            # initialize dummy model with random matrix
             for f_i in dummy_model.F:
-                f_i.weight = torch.nn.Parameter(torch.eye(input_size).float())
+                f_i.weight = torch.nn.Parameter(torch.randn_like(f_i.weight))
 
             # print("B:", B.shape)
             model.B.weight = torch.nn.Parameter(
                 torch.tensor(B).float())  # torch.tensor(B).float()
-            
+
             dummy_model.B.weight = torch.nn.Parameter(
                 torch.tensor(B).float())
 
             # Initialize coefficients with one-hot encoded states
             model.coeffs = torch.nn.Parameter(torch.tensor(
                 coefficients, requires_grad=True, dtype=torch.float32))  # + torch.randn_like(model.coeffs) * args.sigma)
-            
+
             dummy_model.coeffs = torch.nn.Parameter(torch.tensor(
                 coefficients, requires_grad=True, dtype=torch.float32))
 
@@ -211,7 +209,7 @@ def main(args):
             # + torch.randn_like(model.U) * args.sigma)
             model.U = torch.nn.Parameter(torch.tensor(
                 controls, requires_grad=True, dtype=torch.float32))
-            
+
             dummy_model.U = torch.nn.Parameter(torch.tensor(
                 controls, requires_grad=True, dtype=torch.float32))
 
@@ -239,7 +237,7 @@ def main(args):
 
             # indices of the batch
             y_pred = model(X_batch.float(), X_train_idx[idx])
-            
+
             y_pred_dummy = dummy_model(X_batch.float(), X_train_idx[idx])
 
             # sparsifying control inputs with mask
@@ -248,26 +246,27 @@ def main(args):
             #    model.U = torch.relu(model.U)
 
             coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
-            
-            coeff_delta_dummy = dummy_model.coeffs[:, 1:] - dummy_model.coeffs[:, :-1]
+
+            coeff_delta_dummy = dummy_model.coeffs[:,
+                                                   1:] - dummy_model.coeffs[:, :-1]
             # L2 norm of the difference between consecutive coefficients
             smooth_reg = torch.norm(coeff_delta, p=2)
-            
+
             smooth_reg_dummy = torch.norm(coeff_delta_dummy, p=2)
 
             smooth_reg_loss = args.smooth * smooth_reg * input_size
-            
+
             smooth_reg_loss_dummy = args.smooth * smooth_reg_dummy * input_size
 
             control_sparsity = model.control_sparsity_loss()
-            
+
             control_sparsity_dummy = dummy_model.control_sparsity_loss()
 
             corr_mat, best_corr, _ = calculate_best_correlation(
                 torch.tensor(coefficients).T, model.coeffs.T, K)
             wandb.log({"coeff_correlation": best_corr})
             coeff_loss = torch.square(1-best_corr)
-            
+
             corr_mat_dummy, best_corr_dummy, _ = calculate_best_correlation(
                 torch.tensor(coefficients).T, dummy_model.coeffs.T, K)
             coeff_loss_dummy = torch.square(1-best_corr_dummy)
@@ -278,11 +277,11 @@ def main(args):
             control_loss = torch.square(1-control_corr)
 
             single_loss = loss_fn(y_pred, y_batch)
-            
+
             dummy_loss = loss_fn(y_pred_dummy, y_batch)
 
             loss = smooth_reg_loss + single_loss + args.control_sparsity_reg * \
-                control_sparsity + coeff_loss # + control_loss
+                control_sparsity + coeff_loss  # + control_loss
             loss_dummy = smooth_reg_loss_dummy + dummy_loss + args.control_sparsity_reg * \
                 control_sparsity_dummy + coeff_loss_dummy
             wandb.log({'loss': loss.item()})

@@ -1,3 +1,4 @@
+from importlib.metadata import requires
 from inspect import stack
 from locale import normalize
 from mimetypes import init
@@ -44,11 +45,6 @@ class CDLDSModel(torch.nn.Module):
         # U will have the shape: (batch_size, seq_len, control_size)
         self.U = torch.nn.Parameter(torch.randn(
             control_size, time_points, requires_grad=True))
-
-        # Store sparsity weight for L1 regularization
-        self.sparsity_threshold = sparsity_threshold
-
-        self.sparsity_pattern = torch.zeros_like(self.U, dtype=torch.bool)
 
         for _ in range(num_subdyn):
             # f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
@@ -105,22 +101,17 @@ class IdentityModel(torch.nn.Module):
         self.U = torch.nn.Parameter(torch.randn(
             control_size, time_points, requires_grad=True))
 
-        # Store sparsity weight for L1 regularization
-        self.sparsity_threshold = sparsity_threshold
-
-        self.sparsity_pattern = torch.zeros_like(self.U, dtype=torch.bool)
-
         for _ in range(num_subdyn):
             # f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
             #              num_layers=1, batch_first=True, bias=True, bidirectional=True)
             # linear = nn.Linear(hidden_size*2, output_size)
             # self.F.append(nn.Sequential(
             #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
-            # f_i = torch.nn.Linear(input_size, output_size, bias=True)
+            f_i = torch.nn.Linear(input_size, output_size, bias=False)
             
-            # initialize f with identity matrix
-            f_i = torch.nn.Parameter(
-                torch.eye(input_size), requires_grad=True)
+            for param in f_i.parameters():
+                param.requires_grad = False
+            
             self.F.append(f_i)
 
     def forward(self, x, idx):

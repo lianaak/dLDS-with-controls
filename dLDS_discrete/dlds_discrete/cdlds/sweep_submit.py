@@ -20,7 +20,7 @@ def launch_training():
     import wandb
     import os
     os.system(
-        "python -m wandb agent lianaakobian-university-of-vienna/PROTOTYPE_2_State_ALL_TRUE/k95ukm6f")
+        "python -m wandb agent lianaakobian-university-of-vienna/PROTOTYPE_2_State_ALL_TRUE/cgmmn7f4")
     # Initialize W&B Sweep agent to pull hyperparameter configs
     # wandb.agent("4a0rzujk", function=main, count=4)  # count=4 for 4 tasks per node
 

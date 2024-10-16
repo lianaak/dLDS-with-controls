@@ -21,6 +21,21 @@ def init_U(X1, X2, D_control, err=None):
     return U_0.T
 
 
+def find_highlight_regions(states):
+    regions = []
+    start = None
+    for i in range(len(states)):
+        if states[i] == 1 and start is None:
+            start = i
+        elif states[i] == 0 and start is not None:
+            regions.append((start, i - 1))
+            start = None
+    # If the states array ends with a 1, capture that region as well
+    if start is not None:
+        regions.append((start, len(states) - 1))
+    return regions
+
+
 def single_step(X, model):
     # predict the next time step
     X_hat = []
@@ -72,7 +87,7 @@ def plotting(X, plot_states=False, states=None, title=None, show=False, stack_pl
     if plot_states:
         if stack_plots:
             X = np.hstack(X)
-        scaled_states = np.array(
+        """ scaled_states = np.array(
             list(map(lambda x: (x * (X.max() - X.min()) + X.min()), states)))
 
         fig.add_trace(go.Scatter(
@@ -81,7 +96,21 @@ def plotting(X, plot_states=False, states=None, title=None, show=False, stack_pl
             mode='lines',
             line=dict(color='black', width=2),
             name='state'
-        ))
+        )) """
+
+        # Identify the regions where states are 1
+        highlight_regions = find_highlight_regions(states)
+
+        # Add shaded regions (rectangles) to the plot for each highlight region
+        for region in highlight_regions:
+            fig.add_shape(
+                type="rect",
+                xref="x", yref="paper",
+                x0=region[0], x1=region[1],
+                y0=0, y1=1,
+                fillcolor="lightyellow", opacity=1, line_width=0,
+                layer="below"  # Place the shapes in the background
+            )
     fig.update_layout(title=title)
     if show:
         fig.show()

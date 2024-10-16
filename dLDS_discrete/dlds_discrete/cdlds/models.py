@@ -19,6 +19,13 @@ import torch
 import slim
 from sklearn.linear_model import RANSACRegressor
 
+class extract_tensor(torch.nn.Module):
+    def forward(self, x):
+        # Output shape (batch, features, hidden)
+        tensor, _ = x
+        # Reshape shape (batch, hidden)
+        return tensor
+
 
 
 class CDLDSModel(torch.nn.Module):
@@ -36,8 +43,12 @@ class CDLDSModel(torch.nn.Module):
         # self.B = torch.nn.Parameter(
         #    torch.randn(input_size, control_size, requires_grad=True) * 0.01)
 
-        self.B = slim.linear.SpectralLinear(
-            control_size, input_size, bias=False, sigma_min=0.0, sigma_max=1.0)
+        self.B = torch.nn.Linear(
+            control_size, input_size, bias=False)
+        
+        self.bias = torch.nn.Linear(
+            num_subdyn, input_size, bias=False)
+        
 
         # self.B = nn.Linear(control_size, input_size, bias=True)
 
@@ -47,12 +58,13 @@ class CDLDSModel(torch.nn.Module):
             control_size, time_points, requires_grad=True))
 
         for _ in range(num_subdyn):
-            # f_i = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-            #              num_layers=1, batch_first=True, bias=True, bidirectional=True)
-            # linear = nn.Linear(hidden_size*2, output_size)
-            # self.F.append(nn.Sequential(
-            #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
-            f_i = torch.nn.Linear(input_size, output_size, bias=True)
+            #f_i = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+            #            num_layers=1, batch_first=True, bias=False, bidirectional=True)
+            #linear = torch.nn.Linear(hidden_size*2, output_size)
+            # self.F.append(torch.nn.Sequential(
+            #    f_i, extract_tensor(), linear, torch.nn.LayerNorm(output_size)))
+            
+            f_i = torch.nn.Linear(input_size, output_size, bias=False)
             self.F.append(f_i)
 
     def forward(self, x, idx):
@@ -60,8 +72,10 @@ class CDLDSModel(torch.nn.Module):
         batch_size = x.shape[0]
 
         dim = 1 if batch_size > 1 else 0
+        
+        
 
-        x = torch.stack([self.coeffs[i, idx].unsqueeze(dim)*f_i(x) + (self.B(self.effective_U[:, idx].view(-1, 1)))
+        x = torch.stack([self.coeffs[i, idx].unsqueeze(dim)*f_i(x) + (self.B(self.effective_U[:, idx].T)) + self.bias(self.coeffs[:, idx].T)
                          for i, f_i in enumerate(self.F)]).sum(dim=0)
 
         return x
@@ -72,7 +86,10 @@ class CDLDSModel(torch.nn.Module):
 
     def control_sparsity_loss(self):
         # L1 regularization for sparsity on the control matrix U
-        return torch.sum(torch.abs(self.effective_U))
+        return torch.sum(torch.abs(self.effective_U[:self.control_size, :]))
+    
+    def coeff_sparsity_loss(self):
+        return torch.sum(torch.abs(self.coeffs))
     
     
     
@@ -107,7 +124,7 @@ class IdentityModel(torch.nn.Module):
             # linear = nn.Linear(hidden_size*2, output_size)
             # self.F.append(nn.Sequential(
             #    f_i, extract_tensor(), linear, nn.LayerNorm(output_size)))
-            f_i = torch.nn.Linear(input_size, output_size, bias=False)
+            f_i = torch.nn.Linear(input_size, output_size, bias=True)
             
             for param in f_i.parameters():
                 param.requires_grad = False

@@ -114,8 +114,8 @@ def main(args):
         true_dynamics = generator.datasets.A
         states = generator.datasets.states_
         coefficients = generator.datasets.coefficients_
-        controls = generator.datasets.U_[:args.control_size, :]
-        B = generator.datasets.B[:, :args.control_size]
+        controls = generator.datasets.U_#[:args.control_size, :]
+        B = generator.datasets.B#[:, :args.control_size]
 
     else:
         timeseries = np.load(args.data_path).T
@@ -175,7 +175,7 @@ def main(args):
     model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
                        output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
 
-    dummy_model = IdentityModel(input_size=input_size, hidden_size=hidden_size,
+    dummy_model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
                              output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn).float()
 
     with torch.no_grad():

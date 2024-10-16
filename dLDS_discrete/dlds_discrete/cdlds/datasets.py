@@ -47,6 +47,7 @@ class CdLDSDataGenerator:
             raise ValueError("A is defined but B is not defined")
         elif len(self.A) == 0 and self.B is not None:
             raise ValueError("B is defined but A is not defined")
+        
 
     def generate_data(self, n_time_points,  discrete_state_maxT=200, control_density=0.02, initial_conditions=None, sigma=0):
         """ Generate data from the system
@@ -122,7 +123,7 @@ class CdLDSDataGenerator:
             Q, _ = np.linalg.qr(A_rand)
 
             A_k = (Q @ jordan @ np.linalg.inv(Q)).real*self.eigenvalue_radius
-
+            
             self.A.append(A_k)
 
         # B matrix is random
@@ -165,6 +166,10 @@ class CdLDSDataGenerator:
         # Define control input
         u_temp = sparse.rand(self.D_control, T, density=control_density,
                              format="csr")
+        
+        if self.D_control < 0: 
+            # make U all zeros
+            u_temp = sparse.rand(self.D_control + self.K, T, density=0, format="csr") # density 0 because we want all zeros
 
         # add the z one hot encoding to the control input
         if self.fix_point_change and self.K > 1:
@@ -177,6 +182,7 @@ class CdLDSDataGenerator:
 
         else:
             self.U_ = u_temp.toarray()
+            self.coefficients_ = np.ones((self.K, T))
 
     def single_step_reconstruction(self, x, A, B, u, z):
         """Single step of the system

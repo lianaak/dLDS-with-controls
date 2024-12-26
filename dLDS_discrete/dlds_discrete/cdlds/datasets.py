@@ -120,6 +120,7 @@ class CdLDSDataGenerator:
             jordan = linalg.block_diag(*jordan_blocks)
 
             A_rand = np.random.rand(self.D_obs, self.D_obs)
+            # QR decomposition to ensure that the matrix is invertible
             Q, _ = np.linalg.qr(A_rand)
 
             A_k = (Q @ jordan @ np.linalg.inv(Q)).real*self.eigenvalue_radius

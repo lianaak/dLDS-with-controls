@@ -1,6 +1,7 @@
 
 import argparse
 import itertools
+from os import name
 from re import U
 from models import CDLDSModel, IdentityModel
 import stat
@@ -20,6 +21,8 @@ import slim
 import plotly.graph_objects as go
 from scipy.optimize import linear_sum_assignment
 import seaborn as sns
+import plotly
+import plotly.express as px
 
 
 class extract_tensor(nn.Module):
@@ -57,6 +60,20 @@ def create_dataset(dataset, lookback):
         y.append(target)
 
     return torch.tensor(np.array(X)), torch.tensor(np.array(y))
+
+def find_highlight_regions(states):
+    regions = []
+    start = None
+    for i in range(len(states)):
+        if states[i] == 1 and start is None:
+            start = i
+        elif states[i] == 0 and start is not None:
+            regions.append((start, i - 1))
+            start = None
+    # If the states array ends with a 1, capture that region as well
+    if start is not None:
+        regions.append((start, len(states) - 1))
+    return regions
 
 
 def calculate_best_correlation(ground_truth, learned, num_subdyn):
@@ -98,6 +115,7 @@ def main(args):
 
     fix_point_change = args.fix_point_change
     eigenvalue_radius = args.eigenvalue_radius
+    
 
     if args.generate_data:
 
@@ -119,27 +137,26 @@ def main(args):
         bias = generator.datasets.B[:, args.control_size:]
 
     else:
-        timeseries = np.load(args.data_path).T
-        coefficients = np.load(args.state_path)
-        controls = np.load(args.control_path)
+        timeseries = np.load(args.data_path)
+        # coefficients = np.load(args.state_path)
+        # controls = np.load(args.control_path)
 
     # train-test split for time series
-    train_size = int(len(timeseries) * 0.8)
-    test_size = len(timeseries) - train_size
+    train_size = int(len(timeseries) * 1.0)
+    # test_size = len(timeseries) - train_size
     train, test = timeseries[:train_size], timeseries[train_size:]
 
     X_train = torch.tensor(train[:-1])  # .unsqueeze(0)
     y_train = torch.tensor(train[1:])  # .unsqueeze(0)
 
-    X_test = torch.tensor(test[:-1])  # .unsqueeze(0)
-    y_test = torch.tensor(test[1:])  # .unsqueeze(0)
+    # X_test = torch.tensor(test[:-1])  # .unsqueeze(0)
+    # y_test = torch.tensor(test[1:])  # .unsqueeze(0)
 
     X_train_idx = np.arange(len(train)-1)
-    X_test_idx = np.arange(len(train), len(timeseries)-1)
+    # X_test_idx = np.arange(len(train), len(timeseries)-1)
 
-    K = np.unique(states).shape[0]
 
-    corr_states = states.copy()
+    #corr_states = states.copy()
 
     # shift states for plotting according to lookback
     # states = states[lookback:]
@@ -154,7 +171,7 @@ def main(args):
     if args.wandb:
         run = wandb.init(
             # Set the project where this run will be logged
-            project=f"PROTOTYPE_{str(args.num_subdyn)}_State_ALL_TRUE_No_Control_F_Random_Coeff_Random",
+            project=f"PROTOTYPE_{str(args.num_subdyn)}_State_No_Control_Toy_Data_Rand_Coeffs",
             # dir=f'/state_{str(args.num_subdyn)}/fixpoint_change_{str(args.fix_point_change)}', # This is not a wandb feature yet, see issue: https://github.com/wandb/wandb/issues/6392
             # name of the run is a combination of the model name and a timestamp
             # reg{str(round(args.reg, 3))}_
@@ -176,55 +193,21 @@ def main(args):
 
     model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
                        output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, control_size=args.control_size).float()
-
-    dummy_model = CDLDSModel(input_size=input_size, hidden_size=hidden_size,
-                             output_size=input_size, time_points=len(timeseries), num_subdyn=args.num_subdyn, control_size=args.control_size).float()
-
-    with torch.no_grad():
-
-        if args.generate_data:
-
-            # Initialize f_i with true dynamics
-            # for f_i, A in zip(model.F, true_dynamics):
+    
+    if args.generate_data:
+        with torch.no_grad():
+            # model.U = torch.nn.Parameter(torch.tensor(
+            #    controls, requires_grad=True, dtype=torch.float32))
+            # model.coeffs = torch.nn.Parameter(torch.tensor(
+            #     coefficients, requires_grad=True, dtype=torch.float32))
+            for f_i, A in zip(model.F, true_dynamics):
                 # + torch.randn_like(f_i.weight) * args.sigma)
                 #f_i.weight = torch.nn.Parameter(torch.tensor(A).float())
-             #   f_i.weight.copy_(torch.tensor(A).float())
+                f_i.weight.copy_(torch.tensor(A).float())
+    
 
-            # initialize dummy model with not learned identity dynamics
-            for fd_i in dummy_model.F:
-                fd_i.weight = torch.nn.Parameter(torch.eye(
-                    input_size).float(), requires_grad=False)
-
-            # print("B:", B.shape)
-            model.B.weight = torch.nn.Parameter(
-                torch.tensor(B).float())  # torch.tensor(B).float()
-
-            dummy_model.B.weight = torch.nn.Parameter(
-                torch.tensor(B).float())
-            
-            model.bias.weight = torch.nn.Parameter(
-                torch.tensor(bias).float())
-            
-            dummy_model.bias.weight = torch.nn.Parameter(
-                torch.tensor(bias).float())
-
-            # Initialize coefficients with one-hot encoded states
-            # model.coeffs = torch.nn.Parameter(torch.tensor(
-            #    coefficients, requires_grad=True, dtype=torch.float32))  # + torch.randn_like(model.coeffs) * args.sigma)
-
-            dummy_model.coeffs = torch.nn.Parameter(torch.tensor(
-                coefficients, requires_grad=True, dtype=torch.float32))
-
-            # Initialize control input matrix U and add noise
-            # + torch.randn_like(model.U) * args.sigma)
-            model.U = torch.nn.Parameter(torch.tensor(
-                controls, requires_grad=True, dtype=torch.float32))
-
-            dummy_model.U = torch.nn.Parameter(torch.tensor(
-                controls, requires_grad=True, dtype=torch.float32))
 
     optimizer = optim.Adam(model.parameters())
-    optimizer_dummy = optim.Adam(dummy_model.parameters())
     loss_fn = nn.MSELoss()
 
     # loader = TimeSeriesDataset(data.TensorDataset(X_train.float(), y_train.float()), shuffle=True, batch_size=8)
@@ -245,79 +228,57 @@ def main(args):
                 (initial_teacher_forcing_ratio -
                  final_teacher_forcing_ratio) * (epoch / n_epochs)
 
-            # indices of the batch
             y_pred = model(X_batch.float(), X_train_idx[idx])
 
-            y_pred_dummy = dummy_model(X_batch.float(), X_train_idx[idx])
+            # indices of the batch
+            #y_pred = dummy_model(X_batch.float(), X_train_idx[idx])
+
 
             # sparsifying control inputs with mask
             # model.sparsity_mask()
             # with torch.no_grad():
             #    model.U = torch.relu(model.U)
 
-            # add coefficient sparsity loss
-            coeff_sparsity_loss = args.reg * model.coeff_sparsity_loss()
 
 
-            coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
+            # coeff_delta = model.coeffs[:, 1:] - model.coeffs[:, :-1]
 
-            coeff_delta_dummy = dummy_model.coeffs[:,
-                                                   1:] - dummy_model.coeffs[:, :-1]
+            coeff_delta = model.coeffs[:,
+                                                   1:] - model.coeffs[:, :-1]
             # L2 norm of the difference between consecutive coefficients
+            # smooth_reg = torch.norm(coeff_delta, p=2)
+
             smooth_reg = torch.norm(coeff_delta, p=2)
 
-            smooth_reg_dummy = torch.norm(coeff_delta_dummy, p=2)
+            # smooth_reg_loss = args.smooth * smooth_reg * input_size
 
             smooth_reg_loss = args.smooth * smooth_reg * input_size
 
-            smooth_reg_loss_dummy = args.smooth * smooth_reg_dummy * input_size
 
-            control_sparsity_loss = args.control_sparsity_reg * model.control_sparsity_loss()
-
-            control_sparsity_dummy = dummy_model.control_sparsity_loss()
-
-            corr_mat, best_corr, _ = calculate_best_correlation(
-                torch.tensor(coefficients).T, model.coeffs.T, K)
-            coeff_loss = torch.square(1-best_corr)
-            wandb.log({"coeff_correlation_loss": coeff_loss})
-
-            corr_mat_dummy, best_corr_dummy, _ = calculate_best_correlation(
-                torch.tensor(coefficients).T, dummy_model.coeffs.T, K)
-            coeff_loss_dummy = torch.square(1-best_corr_dummy)
-
-            _, control_corr, _ = calculate_best_correlation(
-                torch.tensor(controls).T, model.U.T, controls.shape[0])
-            wandb.log({"control_correlation": control_corr})
-            control_loss = torch.square(1-control_corr)
-
-            single_loss = loss_fn(y_pred, y_batch)
-
-            dummy_loss = loss_fn(y_pred_dummy, y_batch)
+            coeff_sparsity_loss = args.reg * model.coeff_sparsity_loss()
             
-            control_sparsity_loss_dummy = args.control_sparsity_reg * \
-                control_sparsity_dummy
+            # coeff_sparsity_loss = args.reg * model.coeff_sparsity_loss()
 
-            loss = smooth_reg_loss + single_loss + \
-                control_sparsity_loss + coeff_loss + coeff_sparsity_loss # + control_loss
-            loss_dummy = smooth_reg_loss_dummy + dummy_loss + control_sparsity_loss_dummy + coeff_loss_dummy
+
+            # single_loss = loss_fn(y_pred, y_batch)
+
+            rec_loss = loss_fn(y_pred, y_batch)
+            control_sparsity = model.control_sparsity_loss()
+            control_sparsity_loss = args.control_sparsity_reg * \
+                control_sparsity
+
+            loss = smooth_reg_loss + rec_loss + coeff_sparsity_loss + control_sparsity_loss
+            wandb.log({'single_reconstruction_loss': rec_loss.item()})
+            wandb.log({'coeff_sparsity': coeff_sparsity_loss.item()})
+            wandb.log({'control_sparsity': control_sparsity_loss.item()})
             wandb.log({'loss': loss.item()})
-            wandb.log({'single_reconstruction_loss': single_loss.item()})
-            # wandb.log({'dummy_single_reconstruction_loss': dummy_loss.item()})
-            wandb.log({'control_sparsity_loss': control_sparsity_loss.item()})
-            # wandb.log({'control_sparsity_dummy': control_sparsity_loss_dummy.item()})
-            wandb.log({'loss_dummy': loss_dummy.item()})
             # wandb.log({'sparsity_loss': sparsity_loss.item()})
+            # wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
             wandb.log({'smooth_reg_loss': smooth_reg_loss.item()})
-            # wandb.log({'smooth_reg_loss_dummy': smooth_reg_loss_dummy.item()})
-            wandb.log({'coeff_sparsity_loss': coeff_sparsity_loss.item()})
             optimizer.zero_grad()
-            optimizer_dummy.zero_grad()
             loss.backward()
-            loss_dummy.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 7)
-            torch.nn.utils.clip_grad_norm_(dummy_model.parameters(), 7)
             optimizer.step()
-            optimizer_dummy.step()
 
         # Validation
         if epoch % 10 != 0:
@@ -326,35 +287,64 @@ def main(args):
         with torch.no_grad():
             y_pred = model(X_train.float(), X_train_idx)
             train_rmse = np.sqrt(loss_fn(y_pred, y_train))
-            y_pred = model(X_test.float(), X_test_idx)
-            test_rmse = np.sqrt(loss_fn(y_pred, y_test))
-        print("Epoch %d: train RMSE %.4f, test RMSE %.4f" %
-              (epoch, train_rmse, test_rmse))
+            # y_pred = dummy_model(X_test.float(), X_test_idx)
+            # test_rmse = np.sqrt(loss_fn(y_pred, y_test))
+        print("Epoch %d: train RMSE %.4f" %
+              (epoch, train_rmse))
 
     print("Training finished")
     print('Storing visualizations..')
 
-    # Create the Plotly heatmap
-    fig = go.Figure(data=go.Heatmap(
-        z=corr_mat,
-        x=[f'Learned {i+1}' for i in range(K)],
-        y=[f'True {i+1}' for i in range(K)],
-        colorscale='Viridis',
-        zmin=-1, zmax=1,
-        hoverongaps=False,
-        text=corr_mat.round(3),
-        hoverinfo="text",
-    ))
-
-    wandb.log({"correlation_matrix": fig})
-
-    fig = util.plotting(dummy_model.coeffs.detach().numpy()[
-        :, :train_size].T, title='dummy coeffs', plot_states=args.plot_states, states=states)
-    wandb.log({"dummy_coeffs": fig})
     
-    fig = util.plotting(model.coeffs.detach().numpy()[
-        :, :train_size].T, title='coeffs', plot_states=args.plot_states, states=states)
+    
+    # set plotly theme
+    #plotly.io.templates.default = 'plotly_white'
+    custom_template = go.layout.Template(
+    layout=dict(
+        xaxis=dict(
+            showline=True,          # Show the axis line
+            linecolor="grey",      # Dark axis color
+            linewidth=2,            # Thick axis line
+            showgrid=True,         # Hide the grid
+            zeroline=False
+        ),
+        yaxis=dict(
+            showline=True,          # Show the axis line
+            linecolor="grey",      # Dark axis color
+            linewidth=2,            # Thick axis line
+            showgrid=True,         # Hide the grid
+            zeroline=False
+        ),
+        plot_bgcolor='white',  # Optional: Set background color to white for contrast
+        colorway=px.colors.qualitative.Plotly  # Set the color sequence
+        
+    )
+)
+    
+    
+    
+    plotly.io.templates['custom_template'] = custom_template
+    plotly.io.templates.default = 'custom_template'
+
+
+    model_coeffs = pd.DataFrame(model.coeffs.detach().numpy()[
+        :, :train_size].T)
+    
+    if not args.generate_data:
+        model_coeffs['time'] = model_coeffs.index/3.26
+        model_coeffs.index = model_coeffs.loc[:,'time']
+        model_coeffs.drop(columns=['time'], inplace=True)
+    fig = util.plotting(model_coeffs, title='coefficients', plot_states=args.plot_states, states=states)
+    df_len = len(model_coeffs)
+    # time = np.arange(0, df_len, 1) 
+    # divide by 3.26 to get time in seconds
+    # time = time/3.26
+    # fig.update_layout(xaxis = dict(ticktext=time))
+    fig.update_xaxes(showline=True, linewidth=2, linecolor='grey', title='time (s)')
+    fig.update_yaxes(showline=True, linewidth=2, linecolor='grey', title='magnitude')
     wandb.log({"coeffs": fig})
+    plotly.io.write_image(fig, 'coeffs.svg', width=1600, height=400)
+    
 
     # time_series, _ = create_dataset(timeseries, lookback=lookback)
     # multi-step reconstruction by always using the last prediction as input
@@ -375,30 +365,57 @@ def main(args):
                                   i-1)
             recon_single[i] = y_pred_single[-1]
 
-    fig = util.plotting(recon.detach().numpy(), title='reconstruction',
+    fig = util.plotting(recon.detach().numpy(), title='multi-step reconstruction',
                         stack_plots=False, plot_states=args.plot_states, states=states)
     wandb.log({"multi-step reconstruction": fig})
 
+    timeseries_df = pd.DataFrame(timeseries)
+    if not args.generate_data:
+        timeseries_df['time'] = timeseries_df.index/3.26
+        timeseries_df.index = timeseries_df.loc[:,'time']
+        timeseries_df.drop(columns=['time'], inplace=True)
+
+    recon_df = pd.DataFrame(recon_single.detach().numpy())
+    if not args.generate_data:
+        recon_df['time'] = recon_df.index/3.26
+        recon_df.index = recon_df.loc[:,'time']
+        recon_df.drop(columns=['time'], inplace=True)
     # result = model(time_series.float(), torch.arange(len(timeseries)-lookback))
-    fig = util.plotting([timeseries, recon_single.detach().numpy()
-                         ], title='result', stack_plots=True, plot_states=args.plot_states, states=states)
+    fig = util.plotting([timeseries_df, recon_df
+                         ], title='single-step + ground truth reconstruction', stack_plots=True, plot_states=args.plot_states, states=states)
+    
+    # df_len = len(timeseries)
+    # time = np.arange(0, df_len, 1) 
+    #divide by 3.26 to get time in seconds
+    # time = time/3.26
+    # fig.update_layout(xaxis = dict(ticktext=time))
+    fig.update_xaxes(showline=True, linewidth=2, linecolor='grey', title='time (s)')
+    fig.update_yaxes(showline=True, linewidth=2, linecolor='grey', title='amplitude')
     wandb.log({"single-step + ground truth reconstruction": fig})
+    plotly.io.write_image(fig, 'reconstruction.svg', width=1600, height=400)
 
     # print(model.U.detach().numpy())
 
     if args.control_size > 0:
-
+        ctrl = pd.DataFrame(model.effective_U.detach().numpy()[
+            :, :train_size].T)
+        if not args.generate_data:
+            ctrl['time'] = ctrl.index/3.26
+            ctrl.index = ctrl.loc[:,'time']
+            ctrl.drop(columns=['time'], inplace=True)
         # control plot
-        fig = util.plotting(model.effective_U.detach().numpy()[
-            :, :train_size].T, title='Control Signals')
-
-        fig.add_trace(go.Scatter(
+        fig = util.plotting(ctrl, title='Control Signals')
+        fig.update_traces(name='learned control signals')
+        
+        if args.generate_data:
+            fig.add_trace(go.Scatter(
             x=np.arange(train_size),
             y=controls[0],
             mode='lines',
-            line=dict(color='black', width=2),
+            line=dict(dash='dash',color='black', width=1),
             name='true control signals'
         ))
+
 
         wandb.log({"Control Matrix": fig})
 
@@ -408,7 +425,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default='models/')
-    parser.add_argument('--data_path', type=str, default='data.npy')
+    parser.add_argument('--data_path', type=str, default='worm_DS1_low_TE.npy')
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--learning_rate', type=float, default=0.001)
@@ -421,12 +438,13 @@ if __name__ == '__main__':
     parser.add_argument('--control_path', type=str, default='controls.npy')
     parser.add_argument('--control_size', type=int, default=0)
     parser.add_argument('--fix_point_change', type=bool, default=True),
-    parser.add_argument('--eigenvalue_radius', type=float, default=0.96),
+    parser.add_argument('--eigenvalue_radius', type=float, default=0.94),
     parser.add_argument('--sigma', type=float, default=0.01)
     parser.add_argument('--loss_reg', type=float, default=0.1)
-    parser.add_argument('--plot_states', type=bool, default=True)
-    parser.add_argument('--generate_data', type=bool, default=True)
-    parser.add_argument('--wandb', type=bool, default=True)
+    parser.add_argument('--plot_states', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--generate_data', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--wandb', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--with_init', action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     print(args)
     main(args)

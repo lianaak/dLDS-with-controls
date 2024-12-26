@@ -6,6 +6,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import torch
 
+def frames_to_time(df):
+    df['time'] = df.index/3.26
+    df.index = df['time']
+    df.drop(columns=['time'], inplace=True)
+    return df
+
 
 def init_U(X1, X2, D_control, err=None):
     """Initialize the control input matrix U by applying NMF on the first iteration without control and take the residuals as U
@@ -74,7 +80,8 @@ def plotting(X, plot_states=False, states=None, title=None, show=False, stack_pl
                 name = f'predicted'
             lines = px.line(data)
             for line in lines.data:
-                line.name = f'{line.name}_{name}'
+                no = int(line.name)+1
+                line.name = f'{no}_{name}'
                 fig.add_trace(line)
                 fig.update_traces(
                     line=dict(dash=('dash' if i > 0 else 'solid')), selector=dict(name=line.name))
